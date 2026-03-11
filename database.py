@@ -1,8 +1,10 @@
 """Database v2 — SQLite local / PostgreSQL producción"""
 import os
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from models import Base
+from sqlalchemy.orm import sessionmaker, DeclarativeBase
+
+class Base(DeclarativeBase):
+    pass
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./fraud_engine_v2.db")
 if DATABASE_URL.startswith("postgres://"):
@@ -13,6 +15,9 @@ _engine = create_engine(DATABASE_URL, connect_args=connect_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=_engine)
 
 async def init_db():
+    # Import all models so Base knows about them
+    import models      # noqa
+    import auth_models # noqa
     Base.metadata.create_all(bind=_engine)
     print(f"✅ BD inicializada: {DATABASE_URL[:50]}...")
 
@@ -22,3 +27,4 @@ def get_db():
         yield db
     finally:
         db.close()
+
