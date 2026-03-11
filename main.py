@@ -623,7 +623,79 @@ def simulate(
     return {"simulated": count, "entity": entity_code, "summary": summary}
 
 
+# ═══════════════════════════════════════════════════════════
+#  FUNCIÓN INTERNA: score_transaction_internal
+#  Usada por el endpoint de upload masivo (auth_routes.py)
+# ═══════════════════════════════════════════════════════════
+
+def score_transaction_internal(payload: dict, db: Session):
+    """
+    Scorea una transacción desde un dict (usado por upload masivo).
+    payload debe incluir: entity_code, tx_id, amount, channel, cardholder, city, account_number
+    """
+    entity_code = payload.get("entity_code", "DEMO")
+    entity = db.query(Entity).filter(Entity.code == entity_code).first()
+    if not entity:
+        raise ValueError(f"Entidad '{entity_code}' no existe")
+
+    tx = TransactionIn(
+        entity_code=entity_code,
+        identity_value=payload.get("account_number", "UNKNOWN"),
+        channel=payload.get("channel", "CARD"),
+        subtype=payload.get("subtype", ""),
+        amount=float(payload.get("amount", 0)),
+        currency="USD",
+        merchant=payload.get("merchant", ""),
+        city=payload.get("city", ""),
+        country=payload.get("country", "EC"),
+        cardholder=payload.get("cardholder", ""),
+        is_foreign=False,
+        new_device=False,
+        new_beneficiary=bool(payload.get("dest_account")),
+        is_pep=False,
+        is_sanctioned=False,
+    )
+
+    profile  = get_or_create_profile(db, entity, tx.identity_value)
+    features = build_profile_features(profile, tx)
+    ml_prob, ml_ver = ml_service.predict(features, entity_id=entity.id)
+    result   = evaluate(tx, entity, features, ml_prob, ml_ver)
+
+    # Usar tx_id del payload si se provee
+    final_tx_id = payload.get("tx_id") or result["tx_id"]
+
+    record = TransactionRecord(
+        tx_id=final_tx_id, entity_id=entity.id, profile_id=profile.id,
+        identity_type=entity.identity_type, identity_value=profile.identity_value,
+        channel=tx.channel, subtype=tx.subtype or "", amount=tx.amount,
+        currency=tx.currency, merchant=tx.merchant or "", city=tx.city or "",
+        country=tx.country or "", cardholder=tx.cardholder or "",
+        is_foreign=tx.is_foreign, new_device=tx.new_device,
+        new_beneficiary=tx.new_beneficiary, is_pep=tx.is_pep, is_sanctioned=tx.is_sanctioned,
+        score_rules=result["score_rules"], score_ml=result["score_ml"],
+        score_final=result["score_final"], decision=result["decision"],
+        risk_level=result["risk_level"], rules_triggered=result["triggered_rules"],
+        aml_flags=result["aml_flags"], processing_ms=result["processing_ms"],
+    )
+    db.add(record)
+
+    if result["risk_level"] in ("HIGH", "CRITICAL"):
+        top = result["triggered_rules"] + result["aml_flags"]
+        db.add(Alert(
+            tx_id=final_tx_id, entity_id=entity.id, profile_id=profile.id,
+            channel=tx.channel, risk_level=result["risk_level"],
+            decision=result["decision"], score_final=result["score_final"],
+            amount=tx.amount, cardholder=tx.cardholder or "",
+            top_rule=top[0]["name"] if top else "", city=tx.city or "",
+        ))
+
+    update_profile(db, profile, tx, result["score_final"])
+    db.commit()
+
+    result["tx_id"] = final_tx_id
+    return result
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
-
