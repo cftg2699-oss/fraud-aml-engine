@@ -179,10 +179,12 @@ const {useState, useEffect, useCallback, useRef} = React;
 ══════════════════════════════════════════ */
 let API_BASE = localStorage.getItem('api_base') || 'http://localhost:8000';
 let AUTH_TOKEN = localStorage.getItem('auth_token') || null;
+// Ensure token is always read fresh on each api call
+function getToken() { return AUTH_TOKEN || localStorage.getItem('auth_token'); }
 
 async function api(path, opts={}) {
   const r = await fetch(API_BASE + path, {
-    headers: AUTH_TOKEN ? {'Content-Type':'application/json','Authorization':'Bearer '+AUTH_TOKEN} : {'Content-Type':'application/json'},
+    headers: getToken() ? {'Content-Type':'application/json','Authorization':'Bearer '+getToken()} : {'Content-Type':'application/json'},
     headers: {'Content-Type':'application/json', ...opts.headers},
     ...opts,
     body: opts.body ? JSON.stringify(opts.body) : undefined,
