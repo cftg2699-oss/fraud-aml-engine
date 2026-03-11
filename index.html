@@ -183,10 +183,13 @@ let AUTH_TOKEN = localStorage.getItem('auth_token') || null;
 function getToken() { return AUTH_TOKEN || localStorage.getItem('auth_token'); }
 
 async function api(path, opts={}) {
+  const token = getToken();
+  const headers = {'Content-Type':'application/json'};
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  if (opts.headers) Object.assign(headers, opts.headers);
   const r = await fetch(API_BASE + path, {
-    headers: getToken() ? {'Content-Type':'application/json','Authorization':'Bearer '+getToken()} : {'Content-Type':'application/json'},
-    headers: {'Content-Type':'application/json', ...opts.headers},
     ...opts,
+    headers,
     body: opts.body ? JSON.stringify(opts.body) : undefined,
   });
   if (!r.ok) {
