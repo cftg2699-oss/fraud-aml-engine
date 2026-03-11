@@ -1158,13 +1158,15 @@ function ModelPage({entity, showToast}) {
 //  LOGIN SCREEN
 // ═══════════════════════════════════════════════════════
 function LoginScreen({onLogin, apiUrl, setApiUrl, testApi, apiOk}) {
-  const [mode, setMode] = React.useState('login'); // login | register
-  const [email, setEmail] = React.useState('');
-  const [name, setName] = React.useState('');
-  const [password, setPassword] = React.useState('');
-  const [loading, setLoading] = React.useState(false);
-  const [error, setError] = React.useState('');
-  const [success, setSuccess] = React.useState('');
+  const [mode, setMode]           = React.useState('login');
+  const [email, setEmail]         = React.useState('');
+  const [name, setName]           = React.useState('');
+  const [password, setPassword]   = React.useState('');
+  const [entityCode, setEntityCode] = React.useState('');
+  const [entityName, setEntityName] = React.useState('');
+  const [loading, setLoading]     = React.useState(false);
+  const [error, setError]         = React.useState('');
+  const [success, setSuccess]     = React.useState('');
 
   const handleLogin = async () => {
     setLoading(true); setError(''); setSuccess('');
@@ -1185,22 +1187,33 @@ function LoginScreen({onLogin, apiUrl, setApiUrl, testApi, apiOk}) {
 
   const handleRegister = async () => {
     setLoading(true); setError(''); setSuccess('');
+    if (!entityCode.trim() || !entityName.trim()) {
+      setError('Debes indicar el código y nombre de tu institución financiera');
+      setLoading(false); return;
+    }
     try {
       const r = await fetch(API_BASE + '/api/v2/auth/register', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({email, name, password})
+        body: JSON.stringify({
+          email, name, password,
+          requested_entity_code: entityCode.toUpperCase().trim().replace(/\s+/g,'_'),
+          requested_entity_name: entityName.trim()
+        })
       });
       const d = await r.json();
       if (!r.ok) { setError(d.detail || 'Error al registrarse'); return; }
-      setSuccess('✅ Registro exitoso. Espera que el administrador apruebe tu cuenta.');
+      setSuccess('✅ Solicitud enviada. El administrador revisará y aprobará tu acceso en breve.');
       setMode('login');
     } catch(e) { setError('No se pudo conectar al backend'); }
     finally { setLoading(false); }
   };
 
+  const switchToRegister = () => { setMode('register'); setError(''); setSuccess(''); };
+  const switchToLogin    = () => { setMode('login');    setError(''); setSuccess(''); };
+
   return (
-    <div style={{display:'flex',height:'100vh',background:'var(--bg)',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:0}}>
-      {/* Top API bar */}
+    <div style={{display:'flex',height:'100vh',background:'var(--bg)',alignItems:'center',justifyContent:'center',flexDirection:'column'}}>
+      {/* Top bar */}
       <div style={{position:'fixed',top:0,left:0,right:0,background:'var(--bg2)',borderBottom:'1px solid var(--border)',padding:'0 20px',height:52,display:'flex',alignItems:'center',gap:12}}>
         <div className="logo">Fraud<em style={{color:'var(--red)',fontStyle:'normal'}}>&</em>AML <span style={{color:'var(--slate)',fontWeight:400,fontSize:12}}>Platform</span></div>
         <input className="api-input" value={apiUrl} onChange={e=>setApiUrl(e.target.value)}
@@ -1212,8 +1225,8 @@ function LoginScreen({onLogin, apiUrl, setApiUrl, testApi, apiOk}) {
       </div>
 
       {/* Card */}
-      <div style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:16,padding:'40px 36px',width:380,marginTop:52}}>
-        <div style={{textAlign:'center',marginBottom:28}}>
+      <div style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:16,padding:'36px',width:420,marginTop:52,maxHeight:'calc(100vh - 80px)',overflowY:'auto'}}>
+        <div style={{textAlign:'center',marginBottom:24}}>
           <div style={{fontFamily:'var(--sans)',fontSize:22,fontWeight:800,color:'var(--white)'}}>
             Fraud<span style={{color:'var(--red)'}}>AML</span>
           </div>
@@ -1222,21 +1235,41 @@ function LoginScreen({onLogin, apiUrl, setApiUrl, testApi, apiOk}) {
           </div>
         </div>
 
-        {mode==='register' && (
-          <div style={{marginBottom:14}}>
+        {/* ── REGISTRO ── */}
+        {mode==='register' && (<>
+          <div style={{marginBottom:12}}>
             <div style={{fontSize:9,color:'var(--slate)',marginBottom:5,letterSpacing:'.08em'}}>NOMBRE COMPLETO</div>
             <input value={name} onChange={e=>setName(e.target.value)}
-              placeholder="Tu nombre" style={{width:'100%',padding:'9px 12px',fontSize:12}}/>
+              placeholder="Tu nombre completo" style={{width:'100%',padding:'9px 12px',fontSize:12}}/>
           </div>
-        )}
 
-        <div style={{marginBottom:14}}>
+          {/* Separador entidad */}
+          <div style={{margin:'14px 0 10px',padding:'8px 12px',background:'var(--bg3)',borderRadius:6,border:'1px solid var(--border2)'}}>
+            <div style={{fontSize:9,color:'var(--teal)',letterSpacing:'.1em',marginBottom:8,fontWeight:600}}>🏛 TU INSTITUCIÓN FINANCIERA</div>
+            <div style={{marginBottom:10}}>
+              <div style={{fontSize:9,color:'var(--slate)',marginBottom:5,letterSpacing:'.08em'}}>NOMBRE DE LA INSTITUCIÓN</div>
+              <input value={entityName} onChange={e=>setEntityName(e.target.value)}
+                placeholder="ej: Banco de Guayaquil" style={{width:'100%',padding:'8px 10px',fontSize:11}}/>
+            </div>
+            <div>
+              <div style={{fontSize:9,color:'var(--slate)',marginBottom:5,letterSpacing:'.08em'}}>CÓDIGO ÚNICO (sin espacios)</div>
+              <input value={entityCode}
+                onChange={e=>setEntityCode(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g,''))}
+                placeholder="ej: BANCO_GYE" style={{width:'100%',padding:'8px 10px',fontSize:11,fontFamily:'var(--mono)'}}/>
+              <div style={{fontSize:8,color:'var(--slate)',marginTop:4}}>Solo letras mayúsculas, números y guión bajo</div>
+            </div>
+          </div>
+        </>)}
+
+        {/* Email */}
+        <div style={{marginBottom:12}}>
           <div style={{fontSize:9,color:'var(--slate)',marginBottom:5,letterSpacing:'.08em'}}>EMAIL</div>
           <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
             onKeyDown={e=>e.key==='Enter'&&(mode==='login'?handleLogin():handleRegister())}
             placeholder="tu@email.com" style={{width:'100%',padding:'9px 12px',fontSize:12}}/>
         </div>
 
+        {/* Password */}
         <div style={{marginBottom:20}}>
           <div style={{fontSize:9,color:'var(--slate)',marginBottom:5,letterSpacing:'.08em'}}>CONTRASEÑA</div>
           <input type="password" value={password} onChange={e=>setPassword(e.target.value)}
@@ -1244,19 +1277,19 @@ function LoginScreen({onLogin, apiUrl, setApiUrl, testApi, apiOk}) {
             placeholder="••••••••" style={{width:'100%',padding:'9px 12px',fontSize:12}}/>
         </div>
 
-        {error && <div style={{background:'rgba(255,59,92,.1)',border:'1px solid rgba(255,59,92,.3)',color:'var(--red)',padding:'8px 12px',borderRadius:6,fontSize:11,marginBottom:14}}>{error}</div>}
+        {error   && <div style={{background:'rgba(255,59,92,.1)',border:'1px solid rgba(255,59,92,.3)',color:'var(--red)',padding:'8px 12px',borderRadius:6,fontSize:11,marginBottom:14}}>{error}</div>}
         {success && <div style={{background:'rgba(20,184,166,.1)',border:'1px solid rgba(20,184,166,.3)',color:'var(--teal)',padding:'8px 12px',borderRadius:6,fontSize:11,marginBottom:14}}>{success}</div>}
 
         <button onClick={mode==='login'?handleLogin:handleRegister} disabled={loading}
-          style={{width:'100%',padding:'11px',background:'var(--teal)',color:'#000',border:'none',borderRadius:8,fontSize:12,fontWeight:600,fontFamily:'var(--mono)',opacity:loading?0.7:1}}>
-          {loading ? '...' : mode==='login' ? 'Iniciar sesión' : 'Solicitar acceso'}
+          style={{width:'100%',padding:'11px',background:'var(--teal)',color:'#000',border:'none',borderRadius:8,fontSize:12,fontWeight:600,fontFamily:'var(--mono)',opacity:loading?0.7:1,cursor:loading?'default':'pointer'}}>
+          {loading ? '...' : mode==='login' ? 'Iniciar sesión →' : 'Enviar solicitud de acceso →'}
         </button>
 
         <div style={{textAlign:'center',marginTop:16,fontSize:10,color:'var(--slate)'}}>
           {mode==='login' ? (
-            <>¿No tienes cuenta? <span style={{color:'var(--teal)',cursor:'pointer'}} onClick={()=>{setMode('register');setError('');setSuccess('');}}>Solicitar acceso</span></>
+            <>¿No tienes cuenta? <span style={{color:'var(--teal)',cursor:'pointer'}} onClick={switchToRegister}>Solicitar acceso</span></>
           ) : (
-            <>¿Ya tienes cuenta? <span style={{color:'var(--teal)',cursor:'pointer'}} onClick={()=>{setMode('login');setError('');setSuccess('');}}>Iniciar sesión</span></>
+            <>¿Ya tienes cuenta? <span style={{color:'var(--teal)',cursor:'pointer'}} onClick={switchToLogin}>Iniciar sesión</span></>
           )}
         </div>
       </div>
@@ -1268,21 +1301,15 @@ function LoginScreen({onLogin, apiUrl, setApiUrl, testApi, apiOk}) {
 //  ADMIN PANEL — aprobar/rechazar usuarios pendientes
 // ═══════════════════════════════════════════════════════
 function AdminPanel({showToast, onBack}) {
-  const [users, setUsers] = React.useState([]);
-  const [filter, setFilter] = React.useState('PENDING');
+  const [users,   setUsers]   = React.useState([]);
+  const [filter,  setFilter]  = React.useState('PENDING');
   const [loading, setLoading] = React.useState(true);
-  const [entities, setEntities] = React.useState([]);
-  const [assigning, setAssigning] = React.useState({}); // userId -> entityCode
 
   const load = async () => {
     setLoading(true);
     try {
-      const [ud, ed] = await Promise.all([
-        api(`/api/v2/auth/admin/users?status=${filter}`),
-        api('/api/v2/entities')
-      ]);
+      const ud = await api(`/api/v2/auth/admin/users?status=${filter}`);
       setUsers(ud.users || []);
-      setEntities(ed.entities || []);
     } catch(e) { showToast('Error cargando usuarios','err'); }
     finally { setLoading(false); }
   };
@@ -1290,14 +1317,14 @@ function AdminPanel({showToast, onBack}) {
   React.useEffect(()=>{ load(); }, [filter]);
 
   const approve = async (userId) => {
-    const ec = assigning[userId];
-    if (!ec) { showToast('Selecciona una entidad primero','err'); return; }
     try {
-      await fetch(API_BASE + `/api/v2/auth/admin/users/${userId}/approve`, {
+      const r = await fetch(API_BASE + `/api/v2/auth/admin/users/${userId}/approve`, {
         method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+AUTH_TOKEN},
-        body: JSON.stringify({entity_code: ec})
+        body: JSON.stringify({})
       });
-      showToast('Usuario aprobado ✅','ok');
+      const d = await r.json();
+      if (!r.ok) { showToast(d.detail || 'Error al aprobar','err'); return; }
+      showToast('✅ Usuario aprobado — entidad creada automáticamente','ok');
       load();
     } catch(e) { showToast('Error al aprobar','err'); }
   };
@@ -1322,7 +1349,6 @@ function AdminPanel({showToast, onBack}) {
         <h2 style={{fontFamily:'var(--sans)',fontSize:20,fontWeight:700}}>Panel de Usuarios</h2>
       </div>
 
-      {/* Filter tabs */}
       <div style={{display:'flex',gap:8,marginBottom:20}}>
         {['PENDING','APPROVED','ALL'].map(s=>(
           <button key={s} onClick={()=>setFilter(s)}
@@ -1339,33 +1365,60 @@ function AdminPanel({showToast, onBack}) {
       {loading ? (
         <div style={{color:'var(--slate)',fontSize:12}}>Cargando...</div>
       ) : users.length === 0 ? (
-        <div style={{color:'var(--slate)',fontSize:12,textAlign:'center',padding:40}}>No hay usuarios {filter==='PENDING'?'pendientes':''}</div>
+        <div style={{color:'var(--slate)',fontSize:12,textAlign:'center',padding:40}}>
+          No hay usuarios {filter==='PENDING'?'pendientes de aprobación':''}
+        </div>
       ) : (
         <div style={{display:'flex',flexDirection:'column',gap:10}}>
           {users.map(u=>(
-            <div key={u.id} style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:10,padding:'16px 20px',display:'flex',alignItems:'center',gap:16,flexWrap:'wrap'}}>
-              <div style={{flex:1,minWidth:200}}>
-                <div style={{fontSize:13,color:'var(--white)',fontWeight:600}}>{u.name}</div>
-                <div style={{fontSize:10,color:'var(--slate)',marginTop:2}}>{u.email}</div>
-                <div style={{fontSize:9,color:'var(--slate)',marginTop:2}}>{u.created_at?.slice(0,16).replace('T',' ')}</div>
+            <div key={u.id} style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:10,padding:'16px 20px'}}>
+              <div style={{display:'flex',alignItems:'flex-start',gap:16,flexWrap:'wrap'}}>
+                {/* Info usuario */}
+                <div style={{flex:1,minWidth:200}}>
+                  <div style={{fontSize:13,color:'var(--white)',fontWeight:600}}>{u.name}</div>
+                  <div style={{fontSize:10,color:'var(--slate)',marginTop:2}}>{u.email}</div>
+                  <div style={{fontSize:9,color:'var(--slate)',marginTop:2}}>{u.created_at?.slice(0,16).replace('T',' ')}</div>
+                </div>
+                {/* Status */}
+                <span style={{fontSize:9,padding:'3px 8px',borderRadius:4,background:'rgba(0,0,0,.3)',
+                  color:statusColor[u.status]||'var(--slate)',border:`1px solid ${statusColor[u.status]||'var(--slate)'}`,height:'fit-content'}}>
+                  {u.status}
+                </span>
               </div>
-              <div style={{display:'flex',alignItems:'center',gap:8}}>
-                <span style={{fontSize:9,padding:'3px 8px',borderRadius:4,background:'rgba(0,0,0,.3)',color:statusColor[u.status]||'var(--slate)',border:`1px solid ${statusColor[u.status]||'var(--slate)'}`,opacity:.7}}>{u.status}</span>
-                {u.entity_code && <span style={{fontSize:9,color:'var(--teal)'}}>{u.entity_code}</span>}
-              </div>
+
+              {/* Entidad solicitada */}
+              {(u.requested_entity_code || u.entity_code) && (
+                <div style={{marginTop:10,padding:'8px 12px',background:'var(--bg3)',borderRadius:6,border:'1px solid var(--border2)',display:'flex',gap:16,alignItems:'center'}}>
+                  <div style={{fontSize:9,color:'var(--slate)',letterSpacing:'.08em'}}>🏛 ENTIDAD</div>
+                  <div>
+                    <div style={{fontSize:11,color:'var(--white)',fontWeight:600}}>
+                      {u.requested_entity_name || u.entity_code}
+                    </div>
+                    <div style={{fontSize:9,color:'var(--teal)',fontFamily:'var(--mono)'}}>
+                      {u.requested_entity_code || u.entity_code}
+                    </div>
+                  </div>
+                  {u.status === 'APPROVED' && <span style={{marginLeft:'auto',fontSize:8,color:'var(--teal)'}}>✓ Creada</span>}
+                </div>
+              )}
+
+              {!u.requested_entity_code && u.status === 'PENDING' && (
+                <div style={{marginTop:8,padding:'6px 10px',background:'rgba(245,158,11,.08)',border:'1px solid rgba(245,158,11,.2)',borderRadius:5,fontSize:9,color:'var(--amber)'}}>
+                  ⚠ Este usuario no indicó entidad al registrarse. Puedes rechazarlo y pedirle que se registre de nuevo.
+                </div>
+              )}
+
+              {/* Acciones */}
               {u.status === 'PENDING' && (
-                <div style={{display:'flex',gap:8,alignItems:'center'}}>
-                  <select value={assigning[u.id]||''} onChange={e=>setAssigning(a=>({...a,[u.id]:e.target.value}))}
-                    style={{padding:'5px 8px',fontSize:10,minWidth:140}}>
-                    <option value="">-- Asignar entidad --</option>
-                    {entities.map(e=><option key={e.id} value={e.code}>{e.name} ({e.code})</option>)}
-                  </select>
-                  <button onClick={()=>approve(u.id)}
-                    style={{padding:'5px 14px',background:'var(--teal)',color:'#000',border:'none',borderRadius:5,fontSize:10,fontFamily:'var(--mono)'}}>
-                    ✓ Aprobar
+                <div style={{display:'flex',gap:8,marginTop:12}}>
+                  <button onClick={()=>approve(u.id)} disabled={!u.requested_entity_code}
+                    style={{padding:'7px 18px',background:u.requested_entity_code?'var(--teal)':'var(--bg4)',
+                      color:u.requested_entity_code?'#000':'var(--slate)',border:'none',borderRadius:5,fontSize:10,
+                      fontFamily:'var(--mono)',cursor:u.requested_entity_code?'pointer':'default'}}>
+                    ✓ Aprobar y crear entidad
                   </button>
                   <button onClick={()=>reject(u.id)}
-                    style={{padding:'5px 14px',background:'var(--red3)',color:'var(--red)',border:'1px solid rgba(255,59,92,.3)',borderRadius:5,fontSize:10,fontFamily:'var(--mono)'}}>
+                    style={{padding:'7px 18px',background:'var(--red3)',color:'var(--red)',border:'1px solid rgba(255,59,92,.3)',borderRadius:5,fontSize:10,fontFamily:'var(--mono)'}}>
                     ✗ Rechazar
                   </button>
                 </div>
@@ -1374,6 +1427,258 @@ function AdminPanel({showToast, onBack}) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   PAGE: CARGA MASIVA DE TRANSACCIONES
+══════════════════════════════════════════ */
+function UploadPage({entity, showToast}) {
+  const [file,      setFile]    = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [result,    setResult]  = useState(null);
+  const [template,  setTemplate] = useState(null);
+  const fileRef = useRef();
+
+  // Cargar info de la plantilla al montar
+  useEffect(() => {
+    api('/api/v2/auth/upload/template').then(setTemplate).catch(()=>{});
+  }, []);
+
+  const handleFile = (e) => {
+    const f = e.target.files[0];
+    if (f && f.name.endsWith('.xlsx')) { setFile(f); setResult(null); }
+    else showToast('Solo se aceptan archivos .xlsx','err');
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    const f = e.dataTransfer.files[0];
+    if (f && f.name.endsWith('.xlsx')) { setFile(f); setResult(null); }
+    else showToast('Solo se aceptan archivos .xlsx','err');
+  };
+
+  const upload = async () => {
+    if (!file || !entity) return;
+    setUploading(true); setResult(null);
+    try {
+      const token = getToken();
+      const fd = new FormData();
+      fd.append('file', file);
+      const r = await fetch(API_BASE + '/api/v2/auth/upload', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token },
+        body: fd,
+      });
+      const d = await r.json();
+      if (!r.ok) { showToast(d.detail || 'Error al procesar el archivo', 'err'); setUploading(false); return; }
+      setResult(d);
+      if (d.saved > 0) showToast(`✅ ${d.saved} transacciones procesadas`, 'ok');
+      else showToast('No se procesó ninguna fila válida', 'err');
+    } catch(e) { showToast('Error de conexión: ' + e.message, 'err'); }
+    setUploading(false);
+  };
+
+  const decisionColor = (d) => {
+    if (d==='BLOQUEADA') return 'var(--red)';
+    if (d==='REVISIÓN')  return 'var(--amber)';
+    if (d==='ALERTA')    return 'var(--orange)';
+    return 'var(--teal)';
+  };
+
+  // Generar plantilla de ejemplo descargable en el cliente
+  const downloadSampleXlsx = () => {
+    // Generamos CSV que Excel puede abrir fácilmente
+    const cols = ['tx_id','amount','channel','cardholder','city','datetime','account_number','dest_account','dest_name'];
+    const rows = [
+      cols.join(','),
+      'TXN-001,1500.00,CARD,Juan Pérez,Guayaquil,2024-01-15 14:30,ACC1001,,',
+      'TXN-002,25000.00,TRANSFER,María García,Quito,2024-01-15 15:00,ACC2002,ACC3003,Pedro López',
+      'TXN-003,200.00,ATM,Carlos Ruiz,Cuenca,2024-01-15 16:00,ACC4004,,',
+      'TXN-004,800.00,WALLET,Ana Torres,Guayaquil,2024-01-15 16:30,ACC5005,,',
+    ];
+    const blob = new Blob([rows.join('\n')], {type:'text/csv;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href=url; a.download='plantilla_transacciones.csv'; a.click();
+    URL.revokeObjectURL(url);
+    showToast('Plantilla descargada (ábrela en Excel y guarda como .xlsx)','ok');
+  };
+
+  return (
+    <div>
+      <div className="page-title">📤 Carga Masiva de Transacciones</div>
+      <div className="page-sub">Sube un Excel con tus transacciones y las scoreamos al instante</div>
+
+      {!entity && (
+        <div style={{background:'rgba(245,158,11,.1)',border:'1px solid rgba(245,158,11,.3)',borderRadius:8,padding:'12px 16px',marginBottom:16,fontSize:11,color:'var(--amber)'}}>
+          ⚠ Necesitas tener una entidad asignada para cargar transacciones
+        </div>
+      )}
+
+      <div className="grid-2" style={{marginBottom:16,gap:16}}>
+        {/* Panel izquierdo: instrucciones + upload */}
+        <div>
+          {/* Plantilla */}
+          <div className="card" style={{marginBottom:12}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+              <div className="card-title" style={{margin:0}}>1. Descarga la plantilla</div>
+              <button className="btn btn-teal" style={{padding:'5px 12px',fontSize:9}} onClick={downloadSampleXlsx}>
+                ⬇ Descargar plantilla CSV
+              </button>
+            </div>
+            <div style={{fontSize:9,color:'var(--slate)',lineHeight:1.6}}>
+              Descarga el archivo, ábrelo en Excel, agrega tus transacciones y guárdalo como <strong style={{color:'var(--light)'}}>.xlsx</strong>.
+            </div>
+
+            {/* Columnas */}
+            {template && (
+              <div style={{marginTop:10}}>
+                <table className="tbl" style={{fontSize:9}}>
+                  <thead><tr><th>Columna</th><th>Tipo</th><th>Requerida</th><th>Ejemplo</th></tr></thead>
+                  <tbody>
+                    {template.columns.map(c=>(
+                      <tr key={c.name}>
+                        <td style={{fontFamily:'var(--mono)',color:'var(--teal)'}}>{c.name}</td>
+                        <td style={{color:'var(--slate)'}}>{c.type}</td>
+                        <td>{c.required ? <span style={{color:'var(--red)'}}>✓ Sí</span> : <span style={{color:'var(--slate)'}}>No</span>}</td>
+                        <td style={{color:'var(--muted)'}}>{c.example}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div style={{marginTop:8}}>
+                  {template.notes.map((n,i)=>(
+                    <div key={i} style={{fontSize:8,color:'var(--slate)',marginBottom:3}}>• {n}</div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Upload */}
+          <div className="card">
+            <div className="card-title">2. Sube tu archivo</div>
+            <div
+              onDrop={handleDrop} onDragOver={e=>e.preventDefault()}
+              onClick={()=>fileRef.current?.click()}
+              style={{marginTop:8,border:`2px dashed ${file?'var(--teal)':'var(--border2)'}`,borderRadius:8,padding:'28px 16px',
+                textAlign:'center',cursor:'pointer',background:file?'rgba(20,184,166,.05)':'var(--bg3)',transition:'all .2s'}}>
+              <div style={{fontSize:28,marginBottom:8}}>{file ? '📄' : '📂'}</div>
+              {file ? (
+                <>
+                  <div style={{fontSize:11,color:'var(--teal)',fontWeight:600}}>{file.name}</div>
+                  <div style={{fontSize:9,color:'var(--slate)',marginTop:4}}>{(file.size/1024).toFixed(1)} KB</div>
+                </>
+              ) : (
+                <>
+                  <div style={{fontSize:11,color:'var(--muted)'}}>Arrastra tu archivo aquí</div>
+                  <div style={{fontSize:9,color:'var(--slate)',marginTop:4}}>o haz clic para seleccionarlo</div>
+                  <div style={{fontSize:8,color:'var(--border2)',marginTop:4}}>Solo archivos .xlsx</div>
+                </>
+              )}
+              <input ref={fileRef} type="file" accept=".xlsx" style={{display:'none'}} onChange={handleFile}/>
+            </div>
+
+            <div style={{display:'flex',gap:8,marginTop:10}}>
+              <button className="btn btn-red" style={{flex:1}} disabled={!file||uploading||!entity} onClick={upload}>
+                {uploading ? <><Spinner/>Procesando...</> : '⚡ Scorear transacciones →'}
+              </button>
+              {file && <button className="btn btn-ghost" onClick={()=>{setFile(null);setResult(null);fileRef.current&&(fileRef.current.value='');}}>✕</button>}
+            </div>
+          </div>
+        </div>
+
+        {/* Panel derecho: resultados */}
+        <div>
+          {!result && (
+            <div className="card" style={{height:'100%',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:10,opacity:.5}}>
+              <div style={{fontSize:40}}>📊</div>
+              <div style={{fontSize:11,color:'var(--slate)'}}>Los resultados aparecerán aquí</div>
+            </div>
+          )}
+
+          {result && (
+            <>
+              {/* Resumen */}
+              <div className="grid-3" style={{marginBottom:12}}>
+                {[
+                  ['Total filas', result.total,  'var(--muted)'],
+                  ['Procesadas', result.saved,   'var(--teal)'],
+                  ['Con error',  result.errors,  result.errors>0?'var(--red)':'var(--slate)'],
+                ].map(([l,v,c])=>(
+                  <div className="card" key={l} style={{padding:'10px 12px'}}>
+                    <div className="card-title" style={{marginBottom:4}}>{l}</div>
+                    <div style={{fontFamily:'var(--sans)',fontSize:22,fontWeight:800,color:c}}>{v}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Distribución de decisiones */}
+              {result.scored?.length > 0 && (() => {
+                const counts = result.scored.reduce((a,t)=>({...a,[t.decision]:(a[t.decision]||0)+1}),{});
+                return (
+                  <div className="card" style={{marginBottom:12}}>
+                    <div className="card-title">Distribución de decisiones</div>
+                    <div style={{display:'flex',gap:8,marginTop:8,flexWrap:'wrap'}}>
+                      {Object.entries(counts).map(([d,n])=>(
+                        <div key={d} style={{background:'var(--bg3)',borderRadius:6,padding:'8px 14px',textAlign:'center'}}>
+                          <div style={{fontFamily:'var(--sans)',fontSize:20,fontWeight:800,color:decisionColor(d)}}>{n}</div>
+                          <div style={{fontSize:8,color:'var(--slate)',marginTop:2}}>{d}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Errores */}
+              {result.error_detail?.length > 0 && (
+                <div className="card" style={{marginBottom:12,border:'1px solid rgba(255,59,92,.2)'}}>
+                  <div className="card-title" style={{color:'var(--red)'}}>Filas con error ({result.error_detail.length})</div>
+                  {result.error_detail.map((e,i)=>(
+                    <div key={i} style={{padding:'5px 0',borderBottom:'1px solid var(--border)',fontSize:9}}>
+                      <span style={{color:'var(--slate)'}}>Fila {e.row} · </span>
+                      <span style={{color:'var(--light)'}}>{e.tx_id}</span>
+                      <span style={{color:'var(--red)',marginLeft:8}}>{e.errors?.join(', ')}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Preview tabla */}
+              {result.scored?.length > 0 && (
+                <div className="card">
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+                    <div className="card-title" style={{margin:0}}>Preview resultados (primeras {Math.min(result.scored.length,50)} filas)</div>
+                    <span style={{fontSize:8,color:'var(--slate)'}}>{result.scored.length} total</span>
+                  </div>
+                  <div style={{maxHeight:360,overflowY:'auto'}}>
+                    <table className="tbl">
+                      <thead><tr><th>TX ID</th><th>Monto</th><th>Canal</th><th>Score</th><th>Decisión</th><th>Riesgo</th></tr></thead>
+                      <tbody>
+                        {result.scored.slice(0,50).map(t=>(
+                          <tr key={t.tx_id}>
+                            <td className="mono">{t.tx_id}</td>
+                            <td>{fmtAmt(t.amount)}</td>
+                            <td><span className={`badge ${t.risk}`}>{t.channel}</span></td>
+                            <td style={{fontFamily:'var(--sans)',fontWeight:700,color:scoreColor(t.score)}}>{t.score}</td>
+                            <td><span className={`badge ${t.decision}`}>{t.decision}</span></td>
+                            <td><span className={`badge ${t.risk}`}>{t.risk}</span></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div style={{marginTop:8,fontSize:9,color:'var(--teal)'}}>
+                    ✅ Todas las transacciones ya están en el Dashboard y Alertas
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -1450,6 +1755,7 @@ function App() {
     {id:'dashboard', icon:'📊', label:'Dashboard'},
     {id:'alerts',    icon:'🔔', label:'Alertas',    badge:pending},
     {id:'profiles',  icon:'👤', label:'Perfiles'},
+    {id:'upload',    icon:'📤', label:'Carga Masiva'},
     {id:'entities',  icon:'🏛', label:'Entidades'},
     {id:'model',     icon:'🤖', label:'Modelo ML'},
   ];
@@ -1543,6 +1849,7 @@ function App() {
         {page==='dashboard' && <Dashboard entity={activeEntity} toast={showToast}/>}
         {page==='alerts'    && <Alerts entity={activeEntity} showToast={showToast}/>}
         {page==='profiles'  && <Profiles entity={activeEntity} showToast={showToast}/>}
+        {page==='upload'    && <UploadPage entity={activeEntity} showToast={showToast}/>}
         {page==='entities'  && <Entities onEntityChange={loadEntities} showToast={showToast}/>}
         {page==='model'     && <ModelPage entity={activeEntity} showToast={showToast}/>}
       </div>
