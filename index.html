@@ -178,9 +178,11 @@ const {useState, useEffect, useCallback, useRef} = React;
    API CLIENT
 ══════════════════════════════════════════ */
 let API_BASE = localStorage.getItem('api_base') || 'http://localhost:8000';
+let AUTH_TOKEN = localStorage.getItem('auth_token') || null;
 
 async function api(path, opts={}) {
   const r = await fetch(API_BASE + path, {
+    headers: AUTH_TOKEN ? {'Content-Type':'application/json','Authorization':'Bearer '+AUTH_TOKEN} : {'Content-Type':'application/json'},
     headers: {'Content-Type':'application/json', ...opts.headers},
     ...opts,
     body: opts.body ? JSON.stringify(opts.body) : undefined,
@@ -1146,6 +1148,231 @@ function ModelPage({entity, showToast}) {
 /* ══════════════════════════════════════════
    ROOT APP
 ══════════════════════════════════════════ */
+
+// ═══════════════════════════════════════════════════════
+//  LOGIN SCREEN
+// ═══════════════════════════════════════════════════════
+function LoginScreen({onLogin, apiUrl, setApiUrl, testApi, apiOk}) {
+  const [mode, setMode] = React.useState('login'); // login | register
+  const [email, setEmail] = React.useState('');
+  const [name, setName] = React.useState('');
+  const [password, setPassword] = React.useState('');
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState('');
+  const [success, setSuccess] = React.useState('');
+
+  const handleLogin = async () => {
+    setLoading(true); setError(''); setSuccess('');
+    try {
+      const r = await fetch(API_BASE + '/api/v2/auth/login', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({email, password})
+      });
+      const d = await r.json();
+      if (!r.ok) { setError(d.detail || 'Error al iniciar sesión'); return; }
+      localStorage.setItem('auth_token', d.access_token);
+      localStorage.setItem('auth_user', JSON.stringify(d.user));
+      AUTH_TOKEN = d.access_token;
+      onLogin(d.user, d.access_token);
+    } catch(e) { setError('No se pudo conectar al backend'); }
+    finally { setLoading(false); }
+  };
+
+  const handleRegister = async () => {
+    setLoading(true); setError(''); setSuccess('');
+    try {
+      const r = await fetch(API_BASE + '/api/v2/auth/register', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({email, name, password})
+      });
+      const d = await r.json();
+      if (!r.ok) { setError(d.detail || 'Error al registrarse'); return; }
+      setSuccess('✅ Registro exitoso. Espera que el administrador apruebe tu cuenta.');
+      setMode('login');
+    } catch(e) { setError('No se pudo conectar al backend'); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <div style={{display:'flex',height:'100vh',background:'var(--bg)',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:0}}>
+      {/* Top API bar */}
+      <div style={{position:'fixed',top:0,left:0,right:0,background:'var(--bg2)',borderBottom:'1px solid var(--border)',padding:'0 20px',height:52,display:'flex',alignItems:'center',gap:12}}>
+        <div className="logo">Fraud<em style={{color:'var(--red)',fontStyle:'normal'}}>&</em>AML <span style={{color:'var(--slate)',fontWeight:400,fontSize:12}}>Platform</span></div>
+        <input className="api-input" value={apiUrl} onChange={e=>setApiUrl(e.target.value)}
+          onBlur={()=>testApi(apiUrl)} onKeyDown={e=>e.key==='Enter'&&testApi(apiUrl)}
+          placeholder="URL del backend" style={{maxWidth:320,flex:'unset'}}/>
+        <span className={`api-badge ${apiOk==='ok'?'api-ok':apiOk==='err'?'api-err':'api-testing'}`}>
+          {apiOk==='ok'?'● CONECTADO':apiOk==='err'?'✕ ERROR':'… PROBANDO'}
+        </span>
+      </div>
+
+      {/* Card */}
+      <div style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:16,padding:'40px 36px',width:380,marginTop:52}}>
+        <div style={{textAlign:'center',marginBottom:28}}>
+          <div style={{fontFamily:'var(--sans)',fontSize:22,fontWeight:800,color:'var(--white)'}}>
+            Fraud<span style={{color:'var(--red)'}}>AML</span>
+          </div>
+          <div style={{color:'var(--slate)',fontSize:11,marginTop:4}}>
+            {mode==='login' ? 'Iniciar sesión en tu cuenta' : 'Solicitar acceso a la plataforma'}
+          </div>
+        </div>
+
+        {mode==='register' && (
+          <div style={{marginBottom:14}}>
+            <div style={{fontSize:9,color:'var(--slate)',marginBottom:5,letterSpacing:'.08em'}}>NOMBRE COMPLETO</div>
+            <input value={name} onChange={e=>setName(e.target.value)}
+              placeholder="Tu nombre" style={{width:'100%',padding:'9px 12px',fontSize:12}}/>
+          </div>
+        )}
+
+        <div style={{marginBottom:14}}>
+          <div style={{fontSize:9,color:'var(--slate)',marginBottom:5,letterSpacing:'.08em'}}>EMAIL</div>
+          <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
+            onKeyDown={e=>e.key==='Enter'&&(mode==='login'?handleLogin():handleRegister())}
+            placeholder="tu@email.com" style={{width:'100%',padding:'9px 12px',fontSize:12}}/>
+        </div>
+
+        <div style={{marginBottom:20}}>
+          <div style={{fontSize:9,color:'var(--slate)',marginBottom:5,letterSpacing:'.08em'}}>CONTRASEÑA</div>
+          <input type="password" value={password} onChange={e=>setPassword(e.target.value)}
+            onKeyDown={e=>e.key==='Enter'&&(mode==='login'?handleLogin():handleRegister())}
+            placeholder="••••••••" style={{width:'100%',padding:'9px 12px',fontSize:12}}/>
+        </div>
+
+        {error && <div style={{background:'rgba(255,59,92,.1)',border:'1px solid rgba(255,59,92,.3)',color:'var(--red)',padding:'8px 12px',borderRadius:6,fontSize:11,marginBottom:14}}>{error}</div>}
+        {success && <div style={{background:'rgba(20,184,166,.1)',border:'1px solid rgba(20,184,166,.3)',color:'var(--teal)',padding:'8px 12px',borderRadius:6,fontSize:11,marginBottom:14}}>{success}</div>}
+
+        <button onClick={mode==='login'?handleLogin:handleRegister} disabled={loading}
+          style={{width:'100%',padding:'11px',background:'var(--teal)',color:'#000',border:'none',borderRadius:8,fontSize:12,fontWeight:600,fontFamily:'var(--mono)',opacity:loading?0.7:1}}>
+          {loading ? '...' : mode==='login' ? 'Iniciar sesión' : 'Solicitar acceso'}
+        </button>
+
+        <div style={{textAlign:'center',marginTop:16,fontSize:10,color:'var(--slate)'}}>
+          {mode==='login' ? (
+            <>¿No tienes cuenta? <span style={{color:'var(--teal)',cursor:'pointer'}} onClick={()=>{setMode('register');setError('');setSuccess('');}}>Solicitar acceso</span></>
+          ) : (
+            <>¿Ya tienes cuenta? <span style={{color:'var(--teal)',cursor:'pointer'}} onClick={()=>{setMode('login');setError('');setSuccess('');}}>Iniciar sesión</span></>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════
+//  ADMIN PANEL — aprobar/rechazar usuarios pendientes
+// ═══════════════════════════════════════════════════════
+function AdminPanel({showToast, onBack}) {
+  const [users, setUsers] = React.useState([]);
+  const [filter, setFilter] = React.useState('PENDING');
+  const [loading, setLoading] = React.useState(true);
+  const [entities, setEntities] = React.useState([]);
+  const [assigning, setAssigning] = React.useState({}); // userId -> entityCode
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const [ud, ed] = await Promise.all([
+        api(`/api/v2/auth/admin/users?status=${filter}`),
+        api('/api/v2/entities')
+      ]);
+      setUsers(ud.users || []);
+      setEntities(ed.entities || []);
+    } catch(e) { showToast('Error cargando usuarios','err'); }
+    finally { setLoading(false); }
+  };
+
+  React.useEffect(()=>{ load(); }, [filter]);
+
+  const approve = async (userId) => {
+    const ec = assigning[userId];
+    if (!ec) { showToast('Selecciona una entidad primero','err'); return; }
+    try {
+      await fetch(API_BASE + `/api/v2/auth/admin/users/${userId}/approve`, {
+        method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+AUTH_TOKEN},
+        body: JSON.stringify({entity_code: ec})
+      });
+      showToast('Usuario aprobado ✅','ok');
+      load();
+    } catch(e) { showToast('Error al aprobar','err'); }
+  };
+
+  const reject = async (userId) => {
+    if (!confirm('¿Rechazar este usuario?')) return;
+    try {
+      await fetch(API_BASE + `/api/v2/auth/admin/users/${userId}/reject`, {
+        method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+AUTH_TOKEN}
+      });
+      showToast('Usuario rechazado','ok');
+      load();
+    } catch(e) { showToast('Error','err'); }
+  };
+
+  const statusColor = {PENDING:'var(--amber)',APPROVED:'var(--teal)',REJECTED:'var(--red)'};
+
+  return (
+    <div style={{padding:28,maxWidth:900,margin:'0 auto'}}>
+      <div style={{display:'flex',alignItems:'center',gap:16,marginBottom:24}}>
+        <button onClick={onBack} style={{background:'var(--bg3)',border:'1px solid var(--border2)',color:'var(--light)',padding:'6px 14px',borderRadius:6,fontSize:11}}>← Volver</button>
+        <h2 style={{fontFamily:'var(--sans)',fontSize:20,fontWeight:700}}>Panel de Usuarios</h2>
+      </div>
+
+      {/* Filter tabs */}
+      <div style={{display:'flex',gap:8,marginBottom:20}}>
+        {['PENDING','APPROVED','ALL'].map(s=>(
+          <button key={s} onClick={()=>setFilter(s)}
+            style={{padding:'5px 14px',borderRadius:5,fontSize:10,fontFamily:'var(--mono)',
+              background:filter===s?'var(--teal)':'var(--bg3)',
+              color:filter===s?'#000':'var(--muted)',
+              border:filter===s?'none':'1px solid var(--border2)'}}>
+            {s==='PENDING'?'Pendientes':s==='APPROVED'?'Aprobados':'Todos'}
+          </button>
+        ))}
+        <button onClick={load} style={{marginLeft:'auto',padding:'5px 14px',borderRadius:5,fontSize:10,fontFamily:'var(--mono)',background:'var(--bg3)',color:'var(--muted)',border:'1px solid var(--border2)'}}>↻ Recargar</button>
+      </div>
+
+      {loading ? (
+        <div style={{color:'var(--slate)',fontSize:12}}>Cargando...</div>
+      ) : users.length === 0 ? (
+        <div style={{color:'var(--slate)',fontSize:12,textAlign:'center',padding:40}}>No hay usuarios {filter==='PENDING'?'pendientes':''}</div>
+      ) : (
+        <div style={{display:'flex',flexDirection:'column',gap:10}}>
+          {users.map(u=>(
+            <div key={u.id} style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:10,padding:'16px 20px',display:'flex',alignItems:'center',gap:16,flexWrap:'wrap'}}>
+              <div style={{flex:1,minWidth:200}}>
+                <div style={{fontSize:13,color:'var(--white)',fontWeight:600}}>{u.name}</div>
+                <div style={{fontSize:10,color:'var(--slate)',marginTop:2}}>{u.email}</div>
+                <div style={{fontSize:9,color:'var(--slate)',marginTop:2}}>{u.created_at?.slice(0,16).replace('T',' ')}</div>
+              </div>
+              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                <span style={{fontSize:9,padding:'3px 8px',borderRadius:4,background:'rgba(0,0,0,.3)',color:statusColor[u.status]||'var(--slate)',border:`1px solid ${statusColor[u.status]||'var(--slate)'}`,opacity:.7}}>{u.status}</span>
+                {u.entity_code && <span style={{fontSize:9,color:'var(--teal)'}}>{u.entity_code}</span>}
+              </div>
+              {u.status === 'PENDING' && (
+                <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                  <select value={assigning[u.id]||''} onChange={e=>setAssigning(a=>({...a,[u.id]:e.target.value}))}
+                    style={{padding:'5px 8px',fontSize:10,minWidth:140}}>
+                    <option value="">-- Asignar entidad --</option>
+                    {entities.map(e=><option key={e.id} value={e.code}>{e.name} ({e.code})</option>)}
+                  </select>
+                  <button onClick={()=>approve(u.id)}
+                    style={{padding:'5px 14px',background:'var(--teal)',color:'#000',border:'none',borderRadius:5,fontSize:10,fontFamily:'var(--mono)'}}>
+                    ✓ Aprobar
+                  </button>
+                  <button onClick={()=>reject(u.id)}
+                    style={{padding:'5px 14px',background:'var(--red3)',color:'var(--red)',border:'1px solid rgba(255,59,92,.3)',borderRadius:5,fontSize:10,fontFamily:'var(--mono)'}}>
+                    ✗ Rechazar
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function App() {
   const [page,    setPage]    = useState('dashboard');
   const [apiUrl,  setApiUrl]  = useState(API_BASE);
@@ -1154,10 +1381,28 @@ function App() {
   const [entities,setEntities]= useState([]);
   const [pending, setPending] = useState(0);
   const [toast,   setToast]   = useState(null);
+  const [user,    setUser]     = useState(() => {
+    try { return JSON.parse(localStorage.getItem('auth_user')); } catch(e) { return null; }
+  });
+  const [authed,  setAuthed]   = useState(() => !!localStorage.getItem('auth_token'));
 
   const showToast = useCallback((msg, type='ok') => {
     setToast({msg, type});
     setTimeout(()=>setToast(null), 3500);
+  }, []);
+
+  const onLogin = useCallback((u, token) => {
+    setUser(u);
+    setAuthed(true);
+    AUTH_TOKEN = token;
+  }, []);
+
+  const logout = useCallback(() => {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_user');
+    AUTH_TOKEN = null;
+    setUser(null);
+    setAuthed(false);
   }, []);
 
   const testApi = useCallback(async (url) => {
@@ -1204,6 +1449,30 @@ function App() {
     {id:'model',     icon:'🤖', label:'Modelo ML'},
   ];
 
+  // Resolve active entity — analysts are locked to their entity
+  const activeEntity = user && user.role !== 'superadmin' && user.entity_code
+    ? user.entity_code
+    : entity;
+
+  if (!authed) {
+    return <LoginScreen onLogin={onLogin} apiUrl={apiUrl} setApiUrl={setApiUrl} testApi={testApi} apiOk={apiOk}/>;
+  }
+
+  if (page === 'admin') {
+    return (
+      <div style={{background:'var(--bg)',minHeight:'100vh'}}>
+        <div className="topbar" style={{display:'flex',alignItems:'center',padding:'0 20px',gap:14,background:'var(--bg2)',borderBottom:'1px solid var(--border)',height:52}}>
+          <div className="logo">Fraud<em>&</em>AML <span style={{color:'var(--slate)',fontWeight:400,fontSize:12}}>Platform</span></div>
+          <div style={{flex:1}}/>
+          <span style={{fontSize:10,color:'var(--slate)'}}>Admin: {user?.name}</span>
+          <button onClick={logout} style={{padding:'4px 12px',background:'var(--bg3)',border:'1px solid var(--border2)',color:'var(--slate)',borderRadius:5,fontSize:10,fontFamily:'var(--mono)'}}>Cerrar sesión</button>
+        </div>
+        <AdminPanel showToast={showToast} onBack={()=>setPage('dashboard')}/>
+        {toast && <Toast msg={toast.msg} type={toast.type}/>}
+      </div>
+    );
+  }
+
   return (
     <div className="app">
       {/* TOPBAR */}
@@ -1223,7 +1492,15 @@ function App() {
           <div className="pulse"/>
           <span>LIVE</span>
           <span style={{color:'var(--border2)'}}>|</span>
-          <span>{new Date().toLocaleTimeString('es-EC')}</span>
+          <span style={{color:'var(--teal)',fontSize:9}}>{user?.name} · {user?.role}</span>
+          {user?.role==='superadmin' && (
+            <button onClick={()=>setPage('admin')} style={{padding:'3px 10px',background:'var(--purple3)',border:'1px solid rgba(168,85,247,.3)',color:'var(--purple)',borderRadius:4,fontSize:9,fontFamily:'var(--mono)'}}>
+              👥 Usuarios
+            </button>
+          )}
+          <button onClick={logout} style={{padding:'3px 10px',background:'var(--bg3)',border:'1px solid var(--border2)',color:'var(--slate)',borderRadius:4,fontSize:9,fontFamily:'var(--mono)'}}>
+            Salir
+          </button>
         </div>
       </div>
 
@@ -1231,10 +1508,16 @@ function App() {
       <div className="sidebar">
         <div className="sidebar-entity">
           <div className="entity-label">Entidad activa</div>
-          <select className="entity-select" value={entity} onChange={e=>setEntity(e.target.value)}>
-            {entities.map(e=><option key={e.id} value={e.code}>{e.name}</option>)}
-            {entities.length===0 && <option value="DEMO">DEMO (cargando...)</option>}
-          </select>
+          {user?.role === 'superadmin' ? (
+            <select className="entity-select" value={entity} onChange={e=>setEntity(e.target.value)}>
+              {entities.map(e=><option key={e.id} value={e.code}>{e.name}</option>)}
+              {entities.length===0 && <option value="DEMO">DEMO (cargando...)</option>}
+            </select>
+          ) : (
+            <div className="entity-select" style={{padding:'6px 10px',fontSize:11,color:'var(--teal)',cursor:'default'}}>
+              {user?.entity_code || 'Sin entidad'}
+            </div>
+          )}
         </div>
         {nav.map(n=>(
           <div key={n.id} className={`nav-item ${page===n.id?'active':''}`} onClick={()=>setPage(n.id)}>
@@ -1252,11 +1535,11 @@ function App() {
 
       {/* MAIN */}
       <div className="main">
-        {page==='dashboard' && <Dashboard entity={entity} toast={showToast}/>}
-        {page==='alerts'    && <Alerts entity={entity} showToast={showToast}/>}
-        {page==='profiles'  && <Profiles entity={entity} showToast={showToast}/>}
+        {page==='dashboard' && <Dashboard entity={activeEntity} toast={showToast}/>}
+        {page==='alerts'    && <Alerts entity={activeEntity} showToast={showToast}/>}
+        {page==='profiles'  && <Profiles entity={activeEntity} showToast={showToast}/>}
         {page==='entities'  && <Entities onEntityChange={loadEntities} showToast={showToast}/>}
-        {page==='model'     && <ModelPage entity={entity} showToast={showToast}/>}
+        {page==='model'     && <ModelPage entity={activeEntity} showToast={showToast}/>}
       </div>
 
       {toast && <Toast msg={toast.msg} type={toast.type}/>}
@@ -1270,4 +1553,3 @@ ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
 </body>
 </html>
-
