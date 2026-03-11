@@ -504,7 +504,7 @@ function Alerts({entity, showToast}) {
           return (
             <>
               {/* Header */}
-              <div style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:var('--r2'),padding:'14px 16px',marginBottom:12}}>
+              <div style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:'12px',padding:'14px 16px',marginBottom:12}}>
                 <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
                   <div style={{fontFamily:'var(--sans)',fontSize:18,fontWeight:800,color:'var(--white)'}}>{tx.tx_id}</div>
                   <div style={{fontFamily:'var(--sans)',fontSize:26,fontWeight:800,color:scoreColor(al.score_final)}}>{al.score_final}</div>
@@ -1264,9 +1264,10 @@ function App() {
   );
 }
 
-function var_(v) { return `var(${v})`; }
+
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
 </body>
 </html>
+
