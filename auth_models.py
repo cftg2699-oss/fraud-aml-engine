@@ -1,7 +1,7 @@
 """
 Auth Models — User table + Pydantic schemas
 """
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, DateTime
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from pydantic import BaseModel, EmailStr, Field
@@ -18,7 +18,7 @@ class User(Base):
     password    = Column(String(200))
     role        = Column(String(20), default="analyst")     # superadmin | analyst
     status      = Column(String(20), default="PENDING")     # PENDING | APPROVED | REJECTED
-    entity_id   = Column(Integer, ForeignKey("entities.id"), nullable=True)  # asignado por admin
+    entity_id   = Column(Integer, nullable=True)  # asignado por admin
     entity_code = Column(String(30), nullable=True)
     is_active   = Column(Boolean, default=True)
     created_at  = Column(DateTime, server_default=func.now())
