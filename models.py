@@ -1,3 +1,4 @@
+from database import Base
 """
 Models v2 — Entidades, Perfiles, Transacciones, Alertas con Feedback
 """
@@ -6,12 +7,9 @@ from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime
 from sqlalchemy import (Column, Integer, String, Float, Boolean,
                         DateTime, Text, ForeignKey, JSON, Index)
-from sqlalchemy.orm import DeclarativeBase, relationship
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
-
-class Base(DeclarativeBase):
-    pass
 
 # ═══════════════════════════════════════════════════════════════
 #  ORM — ENTIDADES
