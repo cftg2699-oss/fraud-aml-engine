@@ -1,0 +1,1272 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fraud & AML Platform</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#07080c;--bg2:#0c0e17;--bg3:#111420;--bg4:#181b2a;
+  --border:#1c2035;--border2:#252a42;
+  --red:#ff3b5c;--red2:#c42040;--red3:rgba(255,59,92,.12);
+  --amber:#f59e0b;--amber3:rgba(245,158,11,.12);
+  --teal:#14b8a6;--teal3:rgba(20,184,166,.12);
+  --blue:#3b82f6;--blue3:rgba(59,130,246,.12);
+  --purple:#a855f7;--purple3:rgba(168,85,247,.12);
+  --orange:#f97316;
+  --slate:#6b7280;--muted:#94a3b8;--light:#e2e8f0;--white:#f8fafc;
+  --mono:'DM Mono',monospace;--sans:'Syne',sans-serif;
+  --r:8px;--r2:12px;
+}
+html,body,#root{height:100%;background:var(--bg);color:var(--light);font-family:var(--mono);overflow:hidden}
+button{font-family:var(--mono);cursor:pointer}
+input,select,textarea{font-family:var(--mono);background:var(--bg3);border:1px solid var(--border2);color:var(--light);border-radius:5px;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--teal)}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+/* ── LAYOUT ─────────────────────────────── */
+.app{display:grid;grid-template-rows:52px 1fr;grid-template-columns:220px 1fr;height:100vh}
+.topbar{grid-column:1/-1;background:var(--bg2);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 20px;gap:14px;z-index:10}
+.logo{font-family:var(--sans);font-size:16px;font-weight:800;color:var(--white);letter-spacing:-.02em;white-space:nowrap}
+.logo em{color:var(--red);font-style:normal}
+.topbar-api{flex:1;display:flex;align-items:center;gap:8px;margin:0 16px}
+.api-input{flex:1;padding:5px 10px;font-size:10px;letter-spacing:.03em;max-width:380px}
+.api-badge{padding:3px 8px;border-radius:4px;font-size:8px;font-weight:600;letter-spacing:.1em;border:1px solid}
+.api-ok{color:var(--teal);border-color:rgba(20,184,166,.3);background:var(--teal3)}
+.api-err{color:var(--red);border-color:rgba(255,59,92,.3);background:var(--red3)}
+.api-testing{color:var(--amber);border-color:rgba(245,158,11,.3);background:var(--amber3)}
+.topbar-right{display:flex;gap:10px;align-items:center;font-size:9px;color:var(--slate)}
+.pulse{width:6px;height:6px;border-radius:50%;background:var(--teal);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ── SIDEBAR ─────────────────────────────── */
+.sidebar{background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.sidebar-entity{padding:10px 14px;border-bottom:1px solid var(--border);font-size:9px}
+.entity-label{color:var(--slate);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px}
+.entity-select{width:100%;padding:5px 8px;font-size:10px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;
+  font-size:11px;color:var(--muted);border-left:2px solid transparent;transition:all .15s}
+.nav-item:hover{color:var(--light);background:var(--bg3)}
+.nav-item.active{color:var(--white);background:var(--bg3);border-left-color:var(--red)}
+.nav-icon{font-size:14px;width:18px;text-align:center}
+.nav-badge{margin-left:auto;min-width:18px;height:16px;background:var(--red2);color:#fff;
+  border-radius:8px;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px}
+
+/* ── MAIN ─────────────────────────────────── */
+.main{overflow-y:auto;padding:20px;background:var(--bg)}
+.page-title{font-family:var(--sans);font-size:20px;font-weight:700;color:var(--white);margin-bottom:4px}
+.page-sub{font-size:10px;color:var(--slate);margin-bottom:20px}
+
+/* ── CARDS ────────────────────────────────── */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:16px 18px}
+.card-title{font-size:8px;color:var(--slate);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px}
+.card-val{font-family:var(--sans);font-size:28px;font-weight:800;color:var(--white);line-height:1}
+.card-sub{font-size:9px;color:var(--slate);margin-top:3px}
+.card-accent{height:2px;border-radius:2px;margin-bottom:10px}
+
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.grid-5{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+
+/* ── BADGES ─────────────────────────────── */
+.badge{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:3px;
+  font-size:8px;font-weight:600;letter-spacing:.07em;border:1px solid;white-space:nowrap}
+.CRITICAL,.BLOQUEADA,.FRAUD{color:var(--red);border-color:rgba(255,59,92,.35);background:var(--red3)}
+.HIGH,.REVISIÓN{color:var(--amber);border-color:rgba(245,158,11,.35);background:var(--amber3)}
+.MEDIUM,.ALERTA{color:var(--orange);border-color:rgba(249,115,22,.35);background:rgba(249,115,22,.1)}
+.LOW,.APROBADA,.CLEAN{color:var(--teal);border-color:rgba(20,184,166,.35);background:var(--teal3)}
+.CONFIRMED_FRAUD{color:var(--red);border-color:rgba(255,59,92,.45);background:rgba(255,59,92,.18)}
+.FALSE_POSITIVE{color:var(--teal);border-color:rgba(20,184,166,.45);background:rgba(20,184,166,.18)}
+.PENDING{color:var(--amber);border-color:rgba(245,158,11,.3);background:var(--amber3)}
+.UNDER_REVIEW{color:var(--blue);border-color:rgba(59,130,246,.3);background:var(--blue3)}
+.UNKNOWN{color:var(--slate);border-color:var(--border2);background:var(--bg3)}
+
+/* ── TABLE ──────────────────────────────── */
+.tbl{width:100%;border-collapse:collapse;font-size:10px}
+.tbl th{padding:7px 10px;text-align:left;color:var(--slate);border-bottom:1px solid var(--border);
+  font-size:8px;letter-spacing:.1em;font-weight:400;text-transform:uppercase}
+.tbl td{padding:7px 10px;border-bottom:1px solid rgba(255,255,255,.03)}
+.tbl tr:hover td{background:var(--bg3);cursor:pointer}
+.tbl .mono{font-size:9px;color:var(--slate)}
+
+/* ── SCORE BAR ──────────────────────────── */
+.sbar{height:6px;background:var(--bg4);border-radius:3px;overflow:hidden;position:relative}
+.sbar-fill{height:100%;border-radius:3px;transition:width .4s}
+.sbar-markers{position:relative;height:6px}
+
+/* ── FORM ───────────────────────────────── */
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.form-field{display:flex;flex-direction:column;gap:4px}
+.form-label{font-size:8px;color:var(--slate);letter-spacing:.1em;text-transform:uppercase}
+.form-input{padding:7px 10px;font-size:10px}
+.form-select{padding:7px 10px;font-size:10px}
+.btn{padding:8px 16px;border-radius:5px;border:none;font-size:10px;font-weight:600;
+  letter-spacing:.06em;transition:all .2s;cursor:pointer}
+.btn-red{background:var(--red2);color:#fff}.btn-red:hover{background:var(--red)}
+.btn-teal{background:rgba(20,184,166,.15);color:var(--teal);border:1px solid rgba(20,184,166,.3)}.btn-teal:hover{background:rgba(20,184,166,.25)}
+.btn-ghost{background:var(--bg3);color:var(--muted);border:1px solid var(--border2)}.btn-ghost:hover{color:var(--light)}
+.btn-amber{background:rgba(245,158,11,.15);color:var(--amber);border:1px solid rgba(245,158,11,.3)}.btn-amber:hover{background:rgba(245,158,11,.25)}
+.btn:disabled{opacity:.4;cursor:default}
+
+/* ── SECTION TITLE ──────────────────────── */
+.sec{font-size:8px;letter-spacing:.15em;color:var(--slate);text-transform:uppercase;
+  margin:16px 0 8px;display:flex;align-items:center;gap:8px}
+.sec::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* ── FEED ITEM ──────────────────────────── */
+.feed-item{display:flex;align-items:center;gap:10px;padding:8px 12px;
+  border-bottom:1px solid var(--border);transition:background .1s;cursor:default}
+.feed-item:hover{background:var(--bg3)}
+.feed-score{font-family:var(--sans);font-size:16px;font-weight:800;min-width:38px;text-align:right}
+.feed-meta{flex:1;min-width:0}
+.feed-txid{font-size:9px;color:var(--slate)}
+.feed-detail{font-size:10px;color:var(--light);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ── ALERT DETAIL ───────────────────────── */
+.split{display:grid;grid-template-columns:1fr 360px;gap:0;height:calc(100vh - 52px);overflow:hidden}
+.split-left{overflow-y:auto;padding:16px}
+.split-right{background:var(--bg2);border-left:1px solid var(--border);overflow-y:auto;display:flex;flex-direction:column}
+
+/* ── LOADING / EMPTY ────────────────────── */
+.center{display:flex;align-items:center;justify-content:center;height:200px;color:var(--slate);font-size:11px}
+.spinner{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--teal);
+  border-radius:50%;animation:spin .6s linear infinite;margin-right:8px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── TOAST ──────────────────────────────── */
+.toast{position:fixed;bottom:20px;right:20px;padding:10px 16px;border-radius:6px;font-size:10px;
+  border:1px solid;z-index:999;animation:slideup .25s ease;pointer-events:none}
+.toast-ok{background:var(--bg3);color:var(--teal);border-color:rgba(20,184,166,.4)}
+.toast-err{background:var(--bg3);color:var(--red);border-color:rgba(255,59,92,.4)}
+@keyframes slideup{from{transform:translateY(10px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+/* ── TREND ──────────────────────────────── */
+.trend-bar{display:flex;align-items:flex-end;gap:4px;height:60px}
+.trend-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px}
+.trend-bar-inner{width:100%;border-radius:2px 2px 0 0;min-height:2px;transition:height .4s}
+
+/* ── PROFILE STAT ───────────────────────── */
+.pstat{background:var(--bg3);border-radius:5px;padding:8px 10px}
+.pstat-val{font-family:var(--sans);font-size:18px;font-weight:800;line-height:1}
+.pstat-lbl{font-size:8px;color:var(--slate);margin-top:2px;letter-spacing:.06em}
+
+/* ── FEEDBACK ───────────────────────────── */
+.fb-btn{padding:9px 12px;border-radius:5px;border:1px solid;cursor:pointer;
+  font-size:10px;font-weight:600;letter-spacing:.05em;transition:all .2s;text-align:center}
+.fb-fraud{border-color:var(--red2);color:var(--red);background:var(--red3)}
+.fb-fraud.sel,.fb-fraud:hover{background:rgba(255,59,92,.25);border-color:var(--red)}
+.fb-fp{border-color:rgba(20,184,166,.3);color:var(--teal);background:var(--teal3)}
+.fb-fp.sel,.fb-fp:hover{background:rgba(20,184,166,.25);border-color:var(--teal)}
+.fb-review{border-color:rgba(59,130,246,.3);color:var(--blue);background:var(--blue3)}
+.fb-review.sel,.fb-review:hover{background:rgba(59,130,246,.25);border-color:var(--blue)}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState, useEffect, useCallback, useRef} = React;
+
+/* ══════════════════════════════════════════
+   API CLIENT
+══════════════════════════════════════════ */
+let API_BASE = localStorage.getItem('api_base') || 'http://localhost:8000';
+
+async function api(path, opts={}) {
+  const r = await fetch(API_BASE + path, {
+    headers: {'Content-Type':'application/json', ...opts.headers},
+    ...opts,
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  if (!r.ok) {
+    const err = await r.json().catch(()=>({detail: r.statusText}));
+    throw new Error(err.detail || r.statusText);
+  }
+  return r.json();
+}
+
+/* ══════════════════════════════════════════
+   HELPERS
+══════════════════════════════════════════ */
+function scoreColor(s) {
+  if (s >= 800) return 'var(--red)';
+  if (s >= 600) return 'var(--amber)';
+  if (s >= 400) return 'var(--orange)';
+  return 'var(--teal)';
+}
+function scoreGrad(s) {
+  if (s >= 800) return 'linear-gradient(90deg,#c42040,#ff3b5c)';
+  if (s >= 600) return 'linear-gradient(90deg,#d97706,#f59e0b)';
+  if (s >= 400) return 'linear-gradient(90deg,#ea580c,#f97316)';
+  return 'linear-gradient(90deg,#0d9488,#14b8a6)';
+}
+function fmtAmt(v) { return '$' + Number(v).toLocaleString('en',{minimumFractionDigits:2}); }
+function fmtDate(s) { return new Date(s).toLocaleString('es-EC',{dateStyle:'short',timeStyle:'short'}); }
+function riskClass(r) { return r || 'UNKNOWN'; }
+function decisClass(d) { return d?.replace('Ó','O').replace('É','E').replace('Á','A') || ''; }
+
+function Spinner() { return <span className="spinner"/>; }
+function Loading() { return <div className="center"><Spinner/>Cargando...</div>; }
+
+function ScoreBar({score, max=999}) {
+  const pct = (score/max)*100;
+  return (
+    <div>
+      <div style={{display:'flex',justifyContent:'space-between',fontSize:8,color:'var(--slate)',marginBottom:3}}>
+        <span>0</span><span style={{color:'var(--orange)'}}>400</span>
+        <span style={{color:'var(--amber)'}}>600</span><span style={{color:'var(--red)'}}>800</span>
+        <span>999</span>
+      </div>
+      <div className="sbar">
+        {[400,600,800].map(t=>(
+          <div key={t} style={{position:'absolute',left:`${(t/999)*100}%`,top:0,bottom:0,
+            width:1,background:'rgba(255,255,255,.1)',zIndex:1}}/>
+        ))}
+        <div className="sbar-fill" style={{width:`${pct}%`,background:scoreGrad(score)}}/>
+      </div>
+    </div>
+  );
+}
+
+function Toast({msg, type}) {
+  return msg ? <div className={`toast toast-${type}`}>{msg}</div> : null;
+}
+
+/* ══════════════════════════════════════════
+   PAGE: DASHBOARD
+══════════════════════════════════════════ */
+function Dashboard({entity, toast}) {
+  const [stats, setStats]   = useState(null);
+  const [feed,  setFeed]    = useState([]);
+  const [loading, setLoad]  = useState(true);
+
+  const load = useCallback(async () => {
+    try {
+      const [s, f] = await Promise.all([
+        api(`/api/v2/stats${entity ? `?entity_code=${entity}` : ''}`),
+        api(`/api/v2/feed?limit=30${entity ? `&entity_code=${entity}` : ''}`),
+      ]);
+      setStats(s); setFeed(f.data); setLoad(false);
+    } catch(e) { setLoad(false); }
+  }, [entity]);
+
+  useEffect(() => { load(); const t = setInterval(load, 5000); return ()=>clearInterval(t); }, [load]);
+
+  if (loading) return <Loading/>;
+  if (!stats) return <div className="center">No se pudo conectar al backend. Verifica la URL de la API.</div>;
+
+  const T = stats.totals;
+  const maxTrend = Math.max(...(stats.trend_7d||[]).map(d=>d.total), 1);
+
+  return (
+    <div>
+      <div className="page-title">Dashboard</div>
+      <div className="page-sub">Actualización automática cada 5 segundos</div>
+
+      {/* KPIs */}
+      <div className="grid-5" style={{marginBottom:16}}>
+        {[
+          ['Total TX', T.transactions, 'var(--teal)', T.transactions],
+          ['Aprobadas', T.approved, 'var(--teal)', T.approved],
+          ['Alertas', T.alerted, 'var(--orange)', T.alerted],
+          ['En Revisión', T.review, 'var(--amber)', T.review],
+          ['Bloqueadas', T.blocked, 'var(--red)', T.blocked],
+        ].map(([l,v,c])=>(
+          <div className="card" key={l}>
+            <div className="card-accent" style={{background:c}}/>
+            <div className="card-title">{l}</div>
+            <div className="card-val" style={{color:c}}>{v.toLocaleString()}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid-3" style={{marginBottom:16}}>
+        {/* Tasas */}
+        <div className="card">
+          <div className="card-title">Tasas del sistema</div>
+          {[
+            ['Aprobación', stats.rates.approval, 'var(--teal)'],
+            ['Revisión',   stats.rates.review,   'var(--amber)'],
+            ['Bloqueo',    stats.rates.block,     'var(--red)'],
+          ].map(([l,v,c])=>(
+            <div key={l} style={{marginBottom:8}}>
+              <div style={{display:'flex',justifyContent:'space-between',fontSize:9,marginBottom:3}}>
+                <span style={{color:'var(--slate)'}}>{l}</span>
+                <span style={{color:c,fontWeight:600}}>{v}%</span>
+              </div>
+              <div style={{height:4,background:'var(--bg4)',borderRadius:2,overflow:'hidden'}}>
+                <div style={{width:`${v}%`,height:'100%',background:c,borderRadius:2}}/>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Alertas */}
+        <div className="card">
+          <div className="card-title">Alertas por estado</div>
+          {[
+            ['Pendientes',       stats.alerts.pending,          'var(--amber)'],
+            ['Fraude confirmado',stats.alerts.confirmed_fraud,  'var(--red)'],
+            ['Falso positivo',   stats.alerts.false_positives,  'var(--teal)'],
+          ].map(([l,v,c])=>(
+            <div key={l} style={{display:'flex',justifyContent:'space-between',padding:'5px 0',borderBottom:'1px solid rgba(255,255,255,.04)',fontSize:10}}>
+              <span style={{color:'var(--muted)'}}>{l}</span>
+              <span style={{color:c,fontFamily:'var(--sans)',fontWeight:700}}>{v}</span>
+            </div>
+          ))}
+          <div style={{marginTop:8,fontSize:9,color:'var(--slate)'}}>
+            Perfiles: <span style={{color:'var(--light)'}}>{stats.profiles.total}</span> total ·{' '}
+            <span style={{color:'var(--red)'}}>{stats.profiles.fraud}</span> fraude ·{' '}
+            <span style={{color:'var(--teal)'}}>{stats.profiles.clean}</span> limpios
+          </div>
+        </div>
+
+        {/* Tendencia 7d */}
+        <div className="card">
+          <div className="card-title">Tendencia 7 días</div>
+          <div className="trend-bar" style={{marginTop:8}}>
+            {(stats.trend_7d||[]).map((d,i)=>(
+              <div className="trend-col" key={i}>
+                <div className="trend-bar-inner"
+                  style={{height:`${Math.max((d.total/maxTrend)*48,2)}px`,
+                    background:d.blocked>0?'var(--red)':'var(--teal)',opacity:.8}}
+                  title={`${d.date}: ${d.total} TX, ${d.blocked} bloqueadas`}
+                />
+                <span style={{fontSize:7,color:'var(--slate)'}}>{d.date}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{marginTop:6,display:'flex',gap:10,fontSize:8,color:'var(--slate)'}}>
+            <span style={{display:'flex',alignItems:'center',gap:3}}><span style={{width:8,height:8,background:'var(--teal)',borderRadius:2,display:'inline-block'}}/>Normal</span>
+            <span style={{display:'flex',alignItems:'center',gap:3}}><span style={{width:8,height:8,background:'var(--red)',borderRadius:2,display:'inline-block'}}/>Con bloqueos</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Por canal */}
+      <div className="card" style={{marginBottom:16}}>
+        <div className="card-title">Distribución por canal</div>
+        <div className="grid-4" style={{marginTop:8}}>
+          {[['CARD','💳'],['TRANSFER','🏦'],['WALLET','📱'],['ATM','🏧']].map(([ch,ic])=>(
+            <div key={ch} style={{background:'var(--bg3)',borderRadius:6,padding:'10px 12px',textAlign:'center'}}>
+              <div style={{fontSize:20,marginBottom:4}}>{ic}</div>
+              <div style={{fontFamily:'var(--sans)',fontSize:20,fontWeight:800,color:'var(--white)'}}>{(stats.by_channel[ch]||0).toLocaleString()}</div>
+              <div style={{fontSize:9,color:'var(--slate)',marginTop:2}}>{ch}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Feed en tiempo real */}
+      <div className="card">
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+          <div className="card-title" style={{margin:0}}>Feed en tiempo real</div>
+          <div style={{display:'flex',alignItems:'center',gap:6,fontSize:9,color:'var(--teal)'}}>
+            <div className="pulse"/>{fmtDate(new Date().toISOString())}
+          </div>
+        </div>
+        <div style={{maxHeight:300,overflowY:'auto'}}>
+          {feed.length === 0 && <div className="center" style={{height:80}}>Sin transacciones. Usa POST /api/v2/simulate para generar datos.</div>}
+          {feed.map(tx=>(
+            <div className="feed-item" key={tx.tx_id}>
+              <div className="feed-score" style={{color:scoreColor(tx.scoring.score_final)}}>
+                {tx.scoring.score_final}
+              </div>
+              <div style={{width:4,height:28,borderRadius:2,background:scoreColor(tx.scoring.score_final),flexShrink:0}}/>
+              <div className="feed-meta">
+                <div className="feed-txid">{tx.tx_id}</div>
+                <div className="feed-detail">{tx.cardholder} · {tx.channel} · {fmtAmt(tx.amount)} · {tx.city}</div>
+              </div>
+              <span className={`badge ${tx.scoring.decision}`}>{tx.scoring.decision}</span>
+              <span style={{fontSize:9,color:'var(--slate)',marginLeft:4}}>{fmtDate(tx.created_at)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   PAGE: ALERTAS
+══════════════════════════════════════════ */
+function Alerts({entity, showToast}) {
+  const [alerts,   setAlerts]   = useState([]);
+  const [selected, setSel]      = useState(null);
+  const [detail,   setDetail]   = useState(null);
+  const [filter,   setFilter]   = useState('PENDING');
+  const [loading,  setLoad]     = useState(true);
+  const [detLoad,  setDLoad]    = useState(false);
+  const [label,    setLabel]    = useState(null);
+  const [note,     setNote]     = useState('');
+  const [submitting, setSubmit] = useState(false);
+
+  const loadAlerts = useCallback(async () => {
+    try {
+      const d = await api(`/api/v2/alerts?status=${filter}&limit=100${entity?`&entity_code=${entity}`:''}`);
+      setAlerts(d.data); setLoad(false);
+    } catch(e) { setLoad(false); }
+  }, [filter, entity]);
+
+  useEffect(() => { setLoad(true); loadAlerts(); }, [loadAlerts]);
+
+  const selectAlert = async (a) => {
+    setSel(a.id); setDetail(null); setLabel(null); setNote(''); setDLoad(true);
+    try {
+      const d = await api(`/api/v2/alerts/${a.id}`);
+      setDetail(d); setDLoad(false);
+    } catch(e) { setDLoad(false); showToast('Error cargando detalle','err'); }
+  };
+
+  const submitFeedback = async () => {
+    if (!label || !selected) return;
+    setSubmit(true);
+    try {
+      const r = await api(`/api/v2/alerts/${selected}/feedback`, {
+        method:'POST',
+        body:{analyst_label:label, analyst_note:note, analyst_id:'analyst_001', trigger_retrain:true}
+      });
+      showToast(r.retrain_triggered ? '✅ Calificado — modelo re-entrenando...' : '✅ Calificación guardada', 'ok');
+      loadAlerts();
+      setDetail(d => d ? {...d, alert:{...d.alert, feedback:{...d.alert.feedback, status:label, analyst_label:label}}} : d);
+    } catch(e) { showToast('Error: ' + e.message,'err'); }
+    setSubmit(false);
+  };
+
+  const filters = [['PENDING','Pendientes'],['CONFIRMED_FRAUD','Fraude'],['FALSE_POSITIVE','Falso +'],['UNDER_REVIEW','Revisión'],['ALL','Todas']];
+  const current = alerts.find(a=>a.id===selected);
+
+  return (
+    <div className="split" style={{marginTop:-20,marginLeft:-20,marginRight:-20}}>
+      {/* LEFT: Lista */}
+      <div style={{display:'flex',flexDirection:'column',overflow:'hidden',borderRight:'1px solid var(--border)'}}>
+        <div style={{padding:'12px 14px',borderBottom:'1px solid var(--border)',background:'var(--bg2)',flexShrink:0}}>
+          <div style={{fontFamily:'var(--sans)',fontSize:14,fontWeight:700,color:'var(--white)',marginBottom:8}}>Visor de Alertas</div>
+          <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+            {filters.map(([f,l])=>(
+              <button key={f} onClick={()=>setFilter(f)}
+                style={{padding:'3px 8px',borderRadius:4,border:'1px solid',fontSize:8,fontFamily:'var(--mono)',cursor:'pointer',
+                  background:filter===f?'var(--red3)':'var(--bg3)',
+                  borderColor:filter===f?'rgba(255,59,92,.4)':'var(--border2)',
+                  color:filter===f?'var(--red)':'var(--muted)'}}>
+                {l}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div style={{overflowY:'auto',flex:1}}>
+          {loading && <Loading/>}
+          {!loading && alerts.length===0 && <div className="center" style={{flexDirection:'column',gap:6}}>
+            <div style={{fontSize:20,opacity:.3}}>🔔</div>
+            <div>No hay alertas con estado "{filter}"</div>
+          </div>}
+          {alerts.map(a=>(
+            <div key={a.id}
+              onClick={()=>selectAlert(a)}
+              style={{padding:'10px 14px',borderBottom:'1px solid var(--border)',cursor:'pointer',
+                background:selected===a.id?'var(--bg3)':'transparent',
+                borderLeft:`2px solid ${selected===a.id?scoreColor(a.score_final):'transparent'}`}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
+                <span style={{fontFamily:'var(--sans)',fontSize:18,fontWeight:800,color:scoreColor(a.score_final)}}>{a.score_final}</span>
+                <span className={`badge ${a.feedback.status}`} style={{fontSize:7}}>
+                  {a.feedback.status==='PENDING'?'PENDIENTE':a.feedback.status==='CONFIRMED_FRAUD'?'FRAUDE':a.feedback.status==='FALSE_POSITIVE'?'FALSO +':'REVISIÓN'}
+                </span>
+              </div>
+              <div style={{fontSize:9,color:'var(--slate)',marginBottom:3,fontFamily:'var(--mono)'}}>{a.tx_id}</div>
+              <div style={{display:'flex',justifyContent:'space-between',fontSize:10}}>
+                <span style={{color:'var(--white)'}}>{fmtAmt(a.amount)}</span>
+                <span className={`badge ${a.risk_level}`} style={{fontSize:7}}>{a.channel}</span>
+              </div>
+              <div style={{fontSize:9,color:'var(--slate)',marginTop:2}}>{a.cardholder} · {a.city}</div>
+              <div style={{fontSize:8,color:'var(--border2)',marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{a.top_rule}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* MIDDLE: Detalle */}
+      <div className="split-left">
+        {!selected && <div className="center" style={{flexDirection:'column',gap:8,height:'100%'}}>
+          <div style={{fontSize:32,opacity:.2}}>🛡️</div>
+          <div>Selecciona una alerta para revisar</div>
+        </div>}
+        {selected && detLoad && <Loading/>}
+        {selected && !detLoad && detail && (() => {
+          const {alert:al, transaction:tx, profile:p, identity_history:hist, previous_alerts:prevA} = detail;
+          if (!tx) return <div className="center">Error cargando transacción</div>;
+          return (
+            <>
+              {/* Header */}
+              <div style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:var('--r2'),padding:'14px 16px',marginBottom:12}}>
+                <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
+                  <div style={{fontFamily:'var(--sans)',fontSize:18,fontWeight:800,color:'var(--white)'}}>{tx.tx_id}</div>
+                  <div style={{fontFamily:'var(--sans)',fontSize:26,fontWeight:800,color:scoreColor(al.score_final)}}>{al.score_final}</div>
+                  <span className={`badge ${al.decision}`}>{al.decision}</span>
+                  <span className={`badge ${al.risk_level}`}>{al.risk_level}</span>
+                  <span style={{marginLeft:'auto',fontSize:9,color:'var(--slate)'}}>{fmtDate(al.created_at)}</span>
+                </div>
+                <ScoreBar score={al.score_final}/>
+                <div className="grid-4" style={{marginTop:10}}>
+                  {[['Canal',`${tx.channel} ${tx.subtype||''}`],['Monto',fmtAmt(tx.amount)],['Titular',tx.cardholder||'—'],['Ciudad',tx.city||'—']].map(([l,v])=>(
+                    <div key={l} style={{background:'var(--bg3)',borderRadius:5,padding:'7px 9px'}}>
+                      <div style={{fontSize:8,color:'var(--slate)',marginBottom:2}}>{l}</div>
+                      <div style={{fontSize:11,color:'var(--white)',fontWeight:500}}>{v}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Score breakdown */}
+              <div className="sec">Desglose de score</div>
+              <div className="grid-3" style={{marginBottom:12}}>
+                {[['Score Reglas',tx.scoring.score_rules,'Heurísticas (40%)'],
+                  ['Score ML',tx.scoring.score_ml,'Modelo GBT (60%)'],
+                  ['Score Final',tx.scoring.score_final,'Combinado']].map(([l,s,sub])=>(
+                  <div key={l} style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:'var(--r)',padding:'10px 12px'}}>
+                    <div style={{fontSize:8,color:'var(--slate)',marginBottom:4}}>{l}</div>
+                    <div style={{fontFamily:'var(--sans)',fontSize:22,fontWeight:800,color:scoreColor(s)}}>{s}</div>
+                    <div style={{fontSize:8,color:'var(--border2)',marginBottom:5}}>{sub}</div>
+                    <div style={{height:3,background:'var(--bg4)',borderRadius:2,overflow:'hidden'}}>
+                      <div style={{width:`${(s/999)*100}%`,height:'100%',background:scoreGrad(s)}}/>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Reglas */}
+              {tx.rules_triggered?.length>0 && <>
+                <div className="sec">Reglas disparadas ({tx.rules_triggered.length})</div>
+                {tx.rules_triggered.map(r=>(
+                  <div key={r.rule_id} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 10px',
+                    background:'var(--bg2)',border:'1px solid var(--border)',borderLeft:`2px solid ${scoreColor(r.points)}`,
+                    borderRadius:5,marginBottom:5}}>
+                    <span style={{fontSize:8,color:'var(--slate)',minWidth:36}}>{r.rule_id}</span>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:10,color:'var(--white)'}}>{r.name}</div>
+                      <div style={{fontSize:8,color:'var(--slate)'}}>{r.description}</div>
+                    </div>
+                    <span style={{fontFamily:'var(--sans)',fontSize:14,fontWeight:700,color:scoreColor(r.points)}}>+{r.points}</span>
+                  </div>
+                ))}
+              </>}
+
+              {/* AML */}
+              {tx.aml_flags?.length>0 && <>
+                <div className="sec" style={{color:'var(--purple)'}}>Flags AML ({tx.aml_flags.length})</div>
+                {tx.aml_flags.map(r=>(
+                  <div key={r.rule_id} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 10px',
+                    background:'var(--bg2)',border:'1px solid rgba(168,85,247,.25)',borderLeft:'2px solid var(--purple)',
+                    borderRadius:5,marginBottom:5}}>
+                    <span style={{fontSize:8,color:'var(--purple)',minWidth:36}}>{r.rule_id}</span>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:10,color:'var(--white)'}}>{r.name}</div>
+                      <div style={{fontSize:8,color:'var(--slate)'}}>{r.description}</div>
+                    </div>
+                    <span style={{fontFamily:'var(--sans)',fontSize:14,fontWeight:700,color:'var(--purple)'}}>+{r.points}</span>
+                  </div>
+                ))}
+              </>}
+
+              {/* Historial identidad */}
+              {hist?.length>0 && <>
+                <div className="sec">Historial de la identidad ({hist.length} TX)</div>
+                <table className="tbl" style={{marginBottom:12}}>
+                  <thead><tr><th>TX ID</th><th>Canal</th><th>Monto</th><th>Score</th><th>Decisión</th><th>Ciudad</th><th>Fecha</th></tr></thead>
+                  <tbody>
+                    {hist.map(h=>(
+                      <tr key={h.tx_id}>
+                        <td className="mono">{h.tx_id}</td>
+                        <td><span className={`badge ${h.scoring.risk_level}`}>{h.channel}</span></td>
+                        <td>{fmtAmt(h.amount)}</td>
+                        <td style={{fontFamily:'var(--sans)',fontWeight:700,color:scoreColor(h.scoring.score_final)}}>{h.scoring.score_final}</td>
+                        <td><span className={`badge ${h.scoring.decision}`}>{h.scoring.decision}</span></td>
+                        <td style={{color:'var(--slate)'}}>{h.city}</td>
+                        <td className="mono">{fmtDate(h.created_at)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </>}
+            </>
+          );
+        })()}
+      </div>
+
+      {/* RIGHT: Perfil + Feedback */}
+      {selected && detail && (() => {
+        const {alert:al, profile:p} = detail;
+        const alreadyLabeled = al?.feedback?.status && !['PENDING','UNDER_REVIEW'].includes(al.feedback.status);
+        return (
+          <div className="split-right">
+            {/* Perfil */}
+            {p ? (
+              <>
+                <div style={{padding:'12px 14px',borderBottom:'1px solid var(--border)',background:'var(--bg3)'}}>
+                  <div style={{fontFamily:'var(--sans)',fontSize:13,fontWeight:700,color:'var(--white)',marginBottom:1}}>👤 Perfil Transaccional</div>
+                  <div style={{fontSize:9,color:'var(--slate)'}}>{p.identity_type} · {p.identity_value}</div>
+                  <div style={{marginTop:5,display:'flex',gap:5,flexWrap:'wrap'}}>
+                    <span className={`badge ${p.risk.risk_label}`}>{p.risk.risk_label}</span>
+                    {p.risk.fraud_confirmed>0 && <span className="badge CRITICAL">⚠ {p.risk.fraud_confirmed} fraudes</span>}
+                    {p.risk.false_positives>0 && <span className="badge CLEAN">✓ {p.risk.false_positives} FP</span>}
+                  </div>
+                </div>
+
+                <div style={{padding:'10px 14px',borderBottom:'1px solid var(--border)'}}>
+                  <div className="sec" style={{marginTop:0}}>Velocidad</div>
+                  <div className="grid-2">
+                    {[['TX / 1h',p.velocity.tx_1h,3],['TX / 24h',p.velocity.tx_24h,8],['TX / 7d',p.velocity.tx_7d,20],['TX / 30d',p.velocity.tx_30d,60]].map(([l,v,hi])=>(
+                      <div className="pstat" key={l}>
+                        <div className="pstat-val" style={{color:v>=hi?'var(--red)':v>=hi/2?'var(--amber)':'var(--white)'}}>{v}</div>
+                        <div className="pstat-lbl">{l}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{padding:'10px 14px',borderBottom:'1px solid var(--border)'}}>
+                  <div className="sec" style={{marginTop:0}}>Montos</div>
+                  <div className="grid-2">
+                    <div className="pstat">
+                      <div className="pstat-val">{fmtAmt(p.amounts.avg_30d)}</div>
+                      <div className="pstat-lbl">Promedio 30d</div>
+                    </div>
+                    <div className="pstat">
+                      <div className="pstat-val" style={{color:'var(--amber)'}}>{fmtAmt(p.amounts.max_30d)}</div>
+                      <div className="pstat-lbl">Máximo 30d</div>
+                    </div>
+                    <div className="pstat" style={{gridColumn:'1/-1'}}>
+                      <div className="pstat-val">{fmtAmt(p.amounts.sum_24h)}</div>
+                      <div className="pstat-lbl">Volumen 24h</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{padding:'10px 14px',borderBottom:'1px solid var(--border)'}}>
+                  <div className="sec" style={{marginTop:0}}>Geografía</div>
+                  <div style={{display:'flex',flexWrap:'wrap',gap:3,marginBottom:5}}>
+                    {(p.geo.cities_seen||[]).map(c=><span key={c} style={{background:'var(--bg4)',border:'1px solid var(--border)',borderRadius:3,padding:'1px 5px',fontSize:8,color:'var(--slate)'}}>{c}</span>)}
+                  </div>
+                  {p.geo.cities_24h>1 && <div style={{fontSize:9,color:'var(--red)'}}>⚠ {p.geo.cities_24h} ciudades en 24h</div>}
+                </div>
+
+                <div style={{padding:'10px 14px',borderBottom:'1px solid var(--border)'}}>
+                  <div className="sec" style={{marginTop:0}}>Score histórico</div>
+                  <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:8,color:'var(--slate)',marginBottom:3}}>Promedio 30d</div>
+                      <div style={{height:4,background:'var(--bg4)',borderRadius:2,overflow:'hidden'}}>
+                        <div style={{width:`${(p.risk.score_avg_30d/999)*100}%`,height:'100%',background:scoreGrad(p.risk.score_avg_30d)}}/>
+                      </div>
+                    </div>
+                    <span style={{fontFamily:'var(--sans)',fontWeight:700,fontSize:13,color:scoreColor(p.risk.score_avg_30d)}}>{Math.round(p.risk.score_avg_30d)}</span>
+                  </div>
+                  <div style={{display:'flex',alignItems:'center',gap:8}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:8,color:'var(--slate)',marginBottom:3}}>Máximo histórico</div>
+                      <div style={{height:4,background:'var(--bg4)',borderRadius:2,overflow:'hidden'}}>
+                        <div style={{width:`${(p.risk.score_max_ever/999)*100}%`,height:'100%',background:scoreGrad(p.risk.score_max_ever)}}/>
+                      </div>
+                    </div>
+                    <span style={{fontFamily:'var(--sans)',fontWeight:700,fontSize:13,color:scoreColor(p.risk.score_max_ever)}}>{p.risk.score_max_ever}</span>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="center" style={{padding:14,fontSize:10,color:'var(--slate)'}}>Perfil no disponible para esta alerta</div>
+            )}
+
+            {/* FEEDBACK */}
+            <div style={{padding:'12px 14px',marginTop:'auto',borderTop:'1px solid var(--border)',background:'var(--bg3)'}}>
+              <div style={{fontSize:9,color:'var(--slate)',letterSpacing:'.1em',textTransform:'uppercase',marginBottom:8}}>Calificar alerta</div>
+
+              {alreadyLabeled ? (
+                <div>
+                  <span className={`badge ${al.feedback.analyst_label}`} style={{display:'block',textAlign:'center',padding:8,fontSize:10}}>
+                    {al.feedback.analyst_label==='CONFIRMED_FRAUD'?'🚨 FRAUDE CONFIRMADO':al.feedback.analyst_label==='FALSE_POSITIVE'?'✅ FALSO POSITIVO':'🔍 EN REVISIÓN'}
+                  </span>
+                  {al.feedback.analyst_note && <div style={{marginTop:6,fontSize:9,color:'var(--slate)',fontStyle:'italic'}}>"{al.feedback.analyst_note}"</div>}
+                  {al.feedback.used_for_training && <div style={{marginTop:6,background:'rgba(20,184,166,.08)',border:'1px solid rgba(20,184,166,.2)',borderRadius:4,padding:'5px 8px',fontSize:8,color:'var(--teal)',textAlign:'center'}}>🤖 Usado para re-entrenar el modelo</div>}
+                </div>
+              ) : (
+                <>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:8}}>
+                    <div className={`fb-btn fb-fraud ${label==='CONFIRMED_FRAUD'?'sel':''}`} onClick={()=>setLabel('CONFIRMED_FRAUD')}>🚨 Fraude</div>
+                    <div className={`fb-btn fb-fp ${label==='FALSE_POSITIVE'?'sel':''}`} onClick={()=>setLabel('FALSE_POSITIVE')}>✅ Falso +</div>
+                    <div className={`fb-btn fb-review ${label==='UNDER_REVIEW'?'sel':''}`} style={{gridColumn:'1/-1'}} onClick={()=>setLabel('UNDER_REVIEW')}>🔍 En revisión</div>
+                  </div>
+                  <textarea rows={2} placeholder="Notas del analista..."
+                    value={note} onChange={e=>setNote(e.target.value)}
+                    style={{width:'100%',padding:'6px 8px',fontSize:9,resize:'none',marginBottom:6,background:'var(--bg4)',border:'1px solid var(--border2)',color:'var(--light)',borderRadius:4,outline:'none'}}/>
+                  <button className="btn btn-red" style={{width:'100%'}} disabled={!label||submitting} onClick={submitFeedback}>
+                    {submitting?<><Spinner/>Guardando...</>:'Guardar + Re-entrenar →'}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   PAGE: PERFILES
+══════════════════════════════════════════ */
+function Profiles({entity, showToast}) {
+  const [profiles, setProfiles] = useState([]);
+  const [total, setTotal]       = useState(0);
+  const [loading, setLoad]      = useState(true);
+  const [search, setSearch]     = useState('');
+  const [searching, setSearching] = useState(false);
+  const [searchResult, setSearchResult] = useState(null);
+  const [riskFilter, setRisk]   = useState('');
+
+  const load = useCallback(async () => {
+    try {
+      const d = await api(`/api/v2/profiles?limit=50${entity?`&entity_code=${entity}`:''}${riskFilter?`&risk_label=${riskFilter}`:''}`);
+      setProfiles(d.profiles); setTotal(d.total); setLoad(false);
+    } catch(e) { setLoad(false); }
+  }, [entity, riskFilter]);
+
+  useEffect(() => { setLoad(true); load(); }, [load]);
+
+  const doSearch = async () => {
+    if (!search.trim() || !entity) return;
+    setSearching(true); setSearchResult(null);
+    try {
+      const d = await api(`/api/v2/profiles/search?entity_code=${entity}&identity_value=${encodeURIComponent(search)}`);
+      setSearchResult(d);
+    } catch(e) {
+      showToast(e.message==='Perfil no encontrado — aún no tiene transacciones'
+        ? 'Perfil no encontrado para esa identidad' : e.message, 'err');
+    }
+    setSearching(false);
+  };
+
+  return (
+    <div>
+      <div className="page-title">Perfiles Transaccionales</div>
+      <div className="page-sub">Historial acumulativo por identidad — tarjeta, cuenta, usuario o dispositivo</div>
+
+      {/* Search */}
+      <div className="card" style={{marginBottom:14}}>
+        <div style={{display:'flex',gap:8,alignItems:'center'}}>
+          <input className="form-input" style={{flex:1,padding:'7px 10px',fontSize:10}}
+            placeholder="Buscar identidad exacta (ej: ACC1001, 4532015112830366)..."
+            value={search} onChange={e=>setSearch(e.target.value)}
+            onKeyDown={e=>e.key==='Enter'&&doSearch()}/>
+          <button className="btn btn-teal" disabled={!search.trim()||!entity||searching} onClick={doSearch}>
+            {searching?<><Spinner/>Buscando...</>:'Buscar →'}
+          </button>
+          {searchResult && <button className="btn btn-ghost" onClick={()=>{setSearchResult(null);setSearch('')}}>✕ Limpiar</button>}
+        </div>
+        {!entity && <div style={{fontSize:9,color:'var(--amber)',marginTop:6}}>⚠ Selecciona una entidad para buscar perfiles</div>}
+      </div>
+
+      {/* Search result */}
+      {searchResult && (() => {
+        const {profile:p, transactions:txs, alerts} = searchResult;
+        return (
+          <div className="card" style={{marginBottom:14,border:'1px solid rgba(20,184,166,.3)'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:10}}>
+              <div>
+                <div style={{fontFamily:'var(--sans)',fontSize:14,fontWeight:700,color:'var(--white)'}}>Perfil encontrado</div>
+                <div style={{fontSize:9,color:'var(--slate)',marginTop:2}}>{p.identity_type} · {p.identity_value}</div>
+              </div>
+              <span className={`badge ${p.risk.risk_label}`}>{p.risk.risk_label}</span>
+            </div>
+            <div className="grid-4" style={{marginBottom:10}}>
+              {[['TX 30d',p.velocity.tx_30d],['Promedio',fmtAmt(p.amounts.avg_30d)],['Score máx',p.risk.score_max_ever],['Fraudes',p.risk.fraud_confirmed]].map(([l,v])=>(
+                <div className="pstat" key={l}><div className="pstat-val">{v}</div><div className="pstat-lbl">{l}</div></div>
+              ))}
+            </div>
+            <div className="sec">Últimas transacciones</div>
+            <table className="tbl">
+              <thead><tr><th>TX ID</th><th>Canal</th><th>Monto</th><th>Score</th><th>Decisión</th><th>Fecha</th></tr></thead>
+              <tbody>
+                {txs.slice(0,8).map(t=>(
+                  <tr key={t.tx_id}>
+                    <td className="mono">{t.tx_id}</td>
+                    <td><span className={`badge ${t.scoring?.risk_level||'LOW'}`}>{t.channel}</span></td>
+                    <td>{fmtAmt(t.amount)}</td>
+                    <td style={{fontFamily:'var(--sans)',fontWeight:700,color:scoreColor(t.scoring?.score_final||0)}}>{t.scoring?.score_final||0}</td>
+                    <td><span className={`badge ${t.scoring?.decision||'APROBADA'}`}>{t.scoring?.decision}</span></td>
+                    <td className="mono">{fmtDate(t.created_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      })()}
+
+      {/* Filters */}
+      <div style={{display:'flex',gap:8,marginBottom:12,alignItems:'center'}}>
+        <span style={{fontSize:9,color:'var(--slate)'}}>Filtrar por riesgo:</span>
+        {['','UNKNOWN','CLEAN','RISKY','FRAUD'].map(r=>(
+          <button key={r} className={`btn ${riskFilter===r?'btn-red':'btn-ghost'}`}
+            style={{padding:'3px 8px',fontSize:8}} onClick={()=>setRisk(r)}>
+            {r||'Todos'}
+          </button>
+        ))}
+        <span style={{marginLeft:'auto',fontSize:9,color:'var(--slate)'}}>{total} perfiles totales</span>
+      </div>
+
+      {loading && <Loading/>}
+
+      {!loading && (
+        <table className="tbl">
+          <thead><tr><th>Identidad</th><th>Tipo</th><th>TX 30d</th><th>Promedio</th><th>Vol 24h</th><th>Score máx</th><th>Fraudes</th><th>Riesgo</th><th>Última TX</th></tr></thead>
+          <tbody>
+            {profiles.map(p=>(
+              <tr key={p.id}>
+                <td className="mono" style={{color:'var(--light)'}}>{p.identity_value}</td>
+                <td><span className="badge UNKNOWN">{p.identity_type}</span></td>
+                <td style={{color:'var(--white)'}}>{p.velocity.tx_30d}</td>
+                <td>{fmtAmt(p.amounts.avg_30d)}</td>
+                <td style={{color:p.amounts.sum_24h>10000?'var(--red)':'var(--light)'}}>{fmtAmt(p.amounts.sum_24h)}</td>
+                <td style={{fontFamily:'var(--sans)',fontWeight:700,color:scoreColor(p.risk.score_max_ever)}}>{p.risk.score_max_ever}</td>
+                <td style={{color:p.risk.fraud_confirmed>0?'var(--red)':'var(--slate)'}}>{p.risk.fraud_confirmed}</td>
+                <td><span className={`badge ${p.risk.risk_label}`}>{p.risk.risk_label}</span></td>
+                <td className="mono">{p.last_seen?fmtDate(p.last_seen):'—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   PAGE: ENTIDADES
+══════════════════════════════════════════ */
+function Entities({onEntityChange, showToast}) {
+  const [entities, setEntities] = useState([]);
+  const [loading, setLoad]      = useState(true);
+  const [creating, setCreate]   = useState(false);
+  const [form, setForm]         = useState({code:'',name:'',identity_type:'account_number',score_alert:400,score_review:600,score_block:800,weight_rules:0.4,weight_ml:0.6});
+  const [editing, setEditing]   = useState(null);
+  const [saving, setSaving]     = useState(false);
+
+  const load = async () => {
+    try {
+      const d = await api('/api/v2/entities');
+      setEntities(d.entities); setLoad(false);
+    } catch(e) { setLoad(false); }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const create = async () => {
+    setSaving(true);
+    try {
+      await api('/api/v2/entities', {method:'POST', body:form});
+      showToast('✅ Entidad creada','ok');
+      setCreate(false); setForm({code:'',name:'',identity_type:'account_number',score_alert:400,score_review:600,score_block:800,weight_rules:0.4,weight_ml:0.6});
+      load(); onEntityChange();
+    } catch(e) { showToast(e.message,'err'); }
+    setSaving(false);
+  };
+
+  const saveEdit = async (code) => {
+    setSaving(true);
+    try {
+      await api(`/api/v2/entities/${code}`, {method:'PATCH', body:editing});
+      showToast('✅ Entidad actualizada','ok');
+      setEditing(null); load();
+    } catch(e) { showToast(e.message,'err'); }
+    setSaving(false);
+  };
+
+  const idTypes = [['account_number','Número de cuenta'],['card_number','Número de tarjeta'],['user_id','ID de usuario'],['device_fingerprint','Device fingerprint']];
+
+  return (
+    <div>
+      <div className="page-title">Configuración de Entidades</div>
+      <div className="page-sub">Define los umbrales y el tipo de identidad para cada banco o fintech</div>
+
+      <button className="btn btn-red" style={{marginBottom:14}} onClick={()=>setCreate(c=>!c)}>
+        {creating?'✕ Cancelar':'+ Nueva entidad'}
+      </button>
+
+      {creating && (
+        <div className="card" style={{marginBottom:14,border:'1px solid rgba(255,59,92,.2)'}}>
+          <div className="sec" style={{marginTop:0}}>Nueva entidad</div>
+          <div className="form-row">
+            <div className="form-field">
+              <label className="form-label">Código único</label>
+              <input className="form-input" placeholder="BANCO_XYZ" value={form.code} onChange={e=>setForm(f=>({...f,code:e.target.value.toUpperCase()}))}/>
+            </div>
+            <div className="form-field">
+              <label className="form-label">Nombre</label>
+              <input className="form-input" placeholder="Banco de Guayaquil" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/>
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-field">
+              <label className="form-label">Tipo de identidad del perfil</label>
+              <select className="form-select" value={form.identity_type} onChange={e=>setForm(f=>({...f,identity_type:e.target.value}))}>
+                {idTypes.map(([v,l])=><option key={v} value={v}>{l}</option>)}
+              </select>
+            </div>
+          </div>
+          <div style={{fontSize:9,color:'var(--slate)',marginBottom:8}}>Umbrales de score (0–999)</div>
+          <div className="form-row" style={{gridTemplateColumns:'1fr 1fr 1fr'}}>
+            {[['Alerta','score_alert','var(--orange)'],['Revisión','score_review','var(--amber)'],['Bloqueo','score_block','var(--red)']].map(([l,k,c])=>(
+              <div className="form-field" key={k}>
+                <label className="form-label" style={{color:c}}>{l} ≥</label>
+                <input className="form-input" type="number" min={0} max={999} value={form[k]} onChange={e=>setForm(f=>({...f,[k]:parseInt(e.target.value)||0}))}/>
+              </div>
+            ))}
+          </div>
+          <div style={{fontSize:9,color:'var(--slate)',marginBottom:8}}>Pesos del modelo (deben sumar 1.0)</div>
+          <div className="form-row" style={{gridTemplateColumns:'1fr 1fr'}}>
+            {[['Reglas heurísticas','weight_rules'],['Modelo ML','weight_ml']].map(([l,k])=>(
+              <div className="form-field" key={k}>
+                <label className="form-label">{l}</label>
+                <input className="form-input" type="number" min={0} max={1} step={0.1} value={form[k]} onChange={e=>setForm(f=>({...f,[k]:parseFloat(e.target.value)||0}))}/>
+              </div>
+            ))}
+          </div>
+          <button className="btn btn-red" disabled={!form.code||!form.name||saving} onClick={create}>
+            {saving?<><Spinner/>Creando...</>:'Crear entidad →'}
+          </button>
+        </div>
+      )}
+
+      {loading && <Loading/>}
+      {entities.map(e=>(
+        <div className="card" key={e.id} style={{marginBottom:10}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:10}}>
+            <div>
+              <div style={{fontFamily:'var(--sans)',fontSize:15,fontWeight:700,color:'var(--white)'}}>{e.name}</div>
+              <div style={{fontSize:9,color:'var(--slate)',marginTop:1}}>Código: <span style={{color:'var(--teal)'}}>{e.code}</span> · Identidad: <span style={{color:'var(--light)'}}>{e.identity_type}</span></div>
+            </div>
+            <div style={{display:'flex',gap:6}}>
+              <button className="btn btn-ghost" style={{padding:'4px 10px',fontSize:9}} onClick={()=>setEditing(editing?.code===e.code?null:{...e,...e.thresholds,...e.weights,code:e.code})}>
+                {editing?.code===e.code?'✕ Cancelar':'Editar'}
+              </button>
+            </div>
+          </div>
+
+          {editing?.code===e.code ? (
+            <>
+              <div className="form-row" style={{gridTemplateColumns:'1fr 1fr 1fr'}}>
+                {[['Alerta ≥','score_alert','var(--orange)'],['Revisión ≥','score_review','var(--amber)'],['Bloqueo ≥','score_block','var(--red)']].map(([l,k,c])=>(
+                  <div className="form-field" key={k}>
+                    <label className="form-label" style={{color:c}}>{l}</label>
+                    <input className="form-input" type="number" min={0} max={999} value={editing[k]||e.thresholds[k.replace('score_','')]}
+                      onChange={ev=>setEditing(ed=>({...ed,[k]:parseInt(ev.target.value)||0}))}/>
+                  </div>
+                ))}
+              </div>
+              <div className="form-row" style={{gridTemplateColumns:'1fr 1fr'}}>
+                {[['Peso reglas','weight_rules'],['Peso ML','weight_ml']].map(([l,k])=>(
+                  <div className="form-field" key={k}>
+                    <label className="form-label">{l}</label>
+                    <input className="form-input" type="number" min={0} max={1} step={0.1} value={editing[k]||e.weights[k.replace('weight_','')]}
+                      onChange={ev=>setEditing(ed=>({...ed,[k]:parseFloat(ev.target.value)||0}))}/>
+                  </div>
+                ))}
+              </div>
+              <button className="btn btn-teal" disabled={saving} onClick={()=>saveEdit(e.code)}>
+                {saving?<><Spinner/>Guardando...</>:'Guardar cambios →'}
+              </button>
+            </>
+          ) : (
+            <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+              {[['ALERTA','≥'+e.thresholds.alert,'var(--orange)'],['REVISIÓN','≥'+e.thresholds.review,'var(--amber)'],['BLOQUEO','≥'+e.thresholds.block,'var(--red)'],
+                ['Peso Reglas',e.weights.rules,'var(--muted)'],['Peso ML',e.weights.ml,'var(--muted)']].map(([l,v,c])=>(
+                <div key={l} style={{background:'var(--bg3)',borderRadius:4,padding:'5px 10px'}}>
+                  <div style={{fontSize:7,color:'var(--slate)',letterSpacing:'.1em'}}>{l}</div>
+                  <div style={{fontFamily:'var(--sans)',fontWeight:700,color:c}}>{v}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   PAGE: MODELO ML
+══════════════════════════════════════════ */
+function ModelPage({entity, showToast}) {
+  const [stats, setStats]     = useState(null);
+  const [versions, setVers]   = useState([]);
+  const [loading, setLoad]    = useState(true);
+  const [training, setTrain]  = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const [s, v] = await Promise.all([api('/api/v2/model/stats'), api('/api/v2/model/versions')]);
+      setStats(s); setVers(v.versions); setLoad(false);
+    } catch(e) { setLoad(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const train = async (ec) => {
+    setTrain(true);
+    try {
+      const r = await api(`/api/v2/model/train${ec?`?entity_code=${ec}`:''}`, {method:'POST'});
+      showToast('🤖 Entrenamiento iniciado en background','ok');
+      setTimeout(load, 3000);
+    } catch(e) { showToast(e.message,'err'); }
+    setTrain(false);
+  };
+
+  if (loading) return <Loading/>;
+
+  return (
+    <div>
+      <div className="page-title">Monitor del Modelo ML</div>
+      <div className="page-sub">GradientBoosting · Re-entrenamiento automático con feedback de analistas</div>
+
+      {stats && (
+        <>
+          <div className="grid-4" style={{marginBottom:16}}>
+            {[
+              ['Labels totales', stats.labels.total, 'var(--teal)'],
+              ['Fraudes confirmados', stats.labels.fraud, 'var(--red)'],
+              ['Falsos positivos', stats.labels.false_positives, 'var(--teal)'],
+              ['Precisión estimada', stats.precision_estimate+'%', stats.precision_estimate>80?'var(--teal)':stats.precision_estimate>60?'var(--amber)':'var(--red)'],
+            ].map(([l,v,c])=>(
+              <div className="card" key={l}>
+                <div className="card-title">{l}</div>
+                <div className="card-val" style={{color:c}}>{v}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Modelo activo */}
+          {stats.latest_model && (
+            <div className="card" style={{marginBottom:14,border:'1px solid rgba(20,184,166,.25)'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+                <div>
+                  <div style={{fontFamily:'var(--sans)',fontSize:14,fontWeight:700,color:'var(--white)'}}>🤖 Modelo activo</div>
+                  <div style={{fontSize:9,color:'var(--teal)',marginTop:1}}>{stats.latest_model.version}</div>
+                </div>
+                <span className="badge CLEAN">ACTIVO</span>
+              </div>
+              <div className="grid-4">
+                {[
+                  ['Samples', stats.latest_model.training.samples],
+                  ['Accuracy', stats.latest_model.metrics.accuracy ? (stats.latest_model.metrics.accuracy*100).toFixed(1)+'%' : '—'],
+                  ['Precision', stats.latest_model.metrics.precision ? (stats.latest_model.metrics.precision*100).toFixed(1)+'%' : '—'],
+                  ['Recall', stats.latest_model.metrics.recall ? (stats.latest_model.metrics.recall*100).toFixed(1)+'%' : '—'],
+                ].map(([l,v])=>(
+                  <div className="pstat" key={l}><div className="pstat-val">{v}</div><div className="pstat-lbl">{l}</div></div>
+                ))}
+              </div>
+              <div style={{marginTop:10,fontSize:9,color:'var(--slate)'}}>Entrenado: {fmtDate(stats.latest_model.trained_at)}</div>
+            </div>
+          )}
+
+          {/* Acciones */}
+          <div className="card" style={{marginBottom:14}}>
+            <div className="card-title">Re-entrenar modelo</div>
+            <div style={{display:'flex',gap:8,marginTop:8,flexWrap:'wrap'}}>
+              <button className="btn btn-teal" disabled={training||!stats.ready_for_training} onClick={()=>train(null)}>
+                {training?<><Spinner/>Entrenando...</>:'🌍 Re-entrenar modelo global'}
+              </button>
+              {entity && (
+                <button className="btn btn-amber" disabled={training} onClick={()=>train(entity)}>
+                  {training?<><Spinner/>Entrenando...</>:`🏛 Re-entrenar modelo de ${entity}`}
+                </button>
+              )}
+            </div>
+            {!stats.ready_for_training && (
+              <div style={{marginTop:8,fontSize:9,color:'var(--amber)'}}>
+                ⚠ Se necesitan mínimo 5 alertas calificadas. Tienes {stats.labels.total}. Califica alertas en el Visor.
+              </div>
+            )}
+          </div>
+
+          {/* Cómo funciona */}
+          <div className="card" style={{marginBottom:14}}>
+            <div className="card-title">Cómo funciona el feedback loop</div>
+            <div style={{marginTop:8,display:'flex',flexDirection:'column',gap:6}}>
+              {[
+                ['1','Transacción entra','El motor califica con reglas + ML → score 0-999'],
+                ['2','Alerta generada','Si score ≥ umbral de entidad, se crea una alerta'],
+                ['3','Analista califica','Marca como Fraude / Falso positivo + nota'],
+                ['4','Modelo aprende','Con ≥5 labels, el modelo se re-entrena automáticamente'],
+                ['5','Mejora continua','El modelo global aprende de TODAS las entidades'],
+              ].map(([n,t,d])=>(
+                <div key={n} style={{display:'flex',gap:10,padding:'6px 0',borderBottom:'1px solid rgba(255,255,255,.04)'}}>
+                  <div style={{width:20,height:20,borderRadius:'50%',background:'var(--teal)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:700,flexShrink:0,color:'#000'}}>{n}</div>
+                  <div>
+                    <div style={{fontSize:10,color:'var(--white)',fontWeight:500}}>{t}</div>
+                    <div style={{fontSize:9,color:'var(--slate)'}}>{d}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Historial de versiones */}
+      <div className="sec">Historial de versiones del modelo</div>
+      {versions.length===0 && <div className="center" style={{height:80}}>Sin versiones registradas aún</div>}
+      <table className="tbl">
+        <thead><tr><th>Versión</th><th>Tipo</th><th>Samples</th><th>Fraud</th><th>FP</th><th>Accuracy</th><th>Precision</th><th>Estado</th><th>Fecha</th></tr></thead>
+        <tbody>
+          {versions.map(v=>(
+            <tr key={v.id}>
+              <td style={{fontSize:9,color:'var(--teal)'}}>{v.version}</td>
+              <td><span className={`badge ${v.model_type==='global'?'CLEAN':'PENDING'}`}>{v.model_type}</span></td>
+              <td>{v.training.samples}</td>
+              <td style={{color:'var(--red)'}}>{v.training.fraud}</td>
+              <td style={{color:'var(--teal)'}}>{v.training.false_positives}</td>
+              <td>{v.metrics.accuracy?(v.metrics.accuracy*100).toFixed(1)+'%':'—'}</td>
+              <td>{v.metrics.precision?(v.metrics.precision*100).toFixed(1)+'%':'—'}</td>
+              <td><span className={`badge ${v.is_active?'CLEAN':'UNKNOWN'}`}>{v.is_active?'ACTIVO':'HISTÓRICO'}</span></td>
+              <td className="mono">{fmtDate(v.trained_at)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   ROOT APP
+══════════════════════════════════════════ */
+function App() {
+  const [page,    setPage]    = useState('dashboard');
+  const [apiUrl,  setApiUrl]  = useState(API_BASE);
+  const [apiOk,   setApiOk]   = useState(null);
+  const [entity,  setEntity]  = useState('DEMO');
+  const [entities,setEntities]= useState([]);
+  const [pending, setPending] = useState(0);
+  const [toast,   setToast]   = useState(null);
+
+  const showToast = useCallback((msg, type='ok') => {
+    setToast({msg, type});
+    setTimeout(()=>setToast(null), 3500);
+  }, []);
+
+  const testApi = useCallback(async (url) => {
+    setApiOk('testing');
+    try {
+      API_BASE = url;
+      localStorage.setItem('api_base', url);
+      await api('/health');
+      setApiOk('ok');
+    } catch(e) { setApiOk('err'); }
+  }, []);
+
+  const loadEntities = useCallback(async () => {
+    try {
+      const d = await api('/api/v2/entities');
+      setEntities(d.entities);
+      if (d.entities.length && !d.entities.find(e=>e.code===entity)) {
+        setEntity(d.entities[0].code);
+      }
+    } catch(e) {}
+  }, [entity]);
+
+  const loadPending = useCallback(async () => {
+    try {
+      const d = await api(`/api/v2/alerts?status=PENDING&limit=1${entity?`&entity_code=${entity}`:''}`);
+      setPending(d.total);
+    } catch(e) {}
+  }, [entity]);
+
+  useEffect(() => {
+    testApi(apiUrl);
+    const t = setInterval(() => { loadEntities(); loadPending(); }, 8000);
+    loadEntities(); loadPending();
+    return ()=>clearInterval(t);
+  }, []);
+
+  useEffect(() => { loadPending(); }, [entity, page]);
+
+  const nav = [
+    {id:'dashboard', icon:'📊', label:'Dashboard'},
+    {id:'alerts',    icon:'🔔', label:'Alertas',    badge:pending},
+    {id:'profiles',  icon:'👤', label:'Perfiles'},
+    {id:'entities',  icon:'🏛', label:'Entidades'},
+    {id:'model',     icon:'🤖', label:'Modelo ML'},
+  ];
+
+  return (
+    <div className="app">
+      {/* TOPBAR */}
+      <div className="topbar">
+        <div className="logo">Fraud<em>&</em>AML <span style={{color:'var(--slate)',fontWeight:400,fontSize:12}}>Platform</span></div>
+        <div className="topbar-api">
+          <input className="api-input" value={apiUrl}
+            onChange={e=>setApiUrl(e.target.value)}
+            onBlur={()=>testApi(apiUrl)}
+            onKeyDown={e=>e.key==='Enter'&&testApi(apiUrl)}
+            placeholder="URL del backend (Railway)"/>
+          <span className={`api-badge ${apiOk==='ok'?'api-ok':apiOk==='err'?'api-err':'api-testing'}`}>
+            {apiOk==='ok'?'● CONECTADO':apiOk==='err'?'✕ ERROR':'… PROBANDO'}
+          </span>
+        </div>
+        <div className="topbar-right">
+          <div className="pulse"/>
+          <span>LIVE</span>
+          <span style={{color:'var(--border2)'}}>|</span>
+          <span>{new Date().toLocaleTimeString('es-EC')}</span>
+        </div>
+      </div>
+
+      {/* SIDEBAR */}
+      <div className="sidebar">
+        <div className="sidebar-entity">
+          <div className="entity-label">Entidad activa</div>
+          <select className="entity-select" value={entity} onChange={e=>setEntity(e.target.value)}>
+            {entities.map(e=><option key={e.id} value={e.code}>{e.name}</option>)}
+            {entities.length===0 && <option value="DEMO">DEMO (cargando...)</option>}
+          </select>
+        </div>
+        {nav.map(n=>(
+          <div key={n.id} className={`nav-item ${page===n.id?'active':''}`} onClick={()=>setPage(n.id)}>
+            <span className="nav-icon">{n.icon}</span>
+            {n.label}
+            {n.badge>0 && <span className="nav-badge">{n.badge}</span>}
+          </div>
+        ))}
+        <div style={{marginTop:'auto',padding:'10px 14px',fontSize:8,color:'var(--slate)',borderTop:'1px solid var(--border)'}}>
+          <div>Score: 0–999</div>
+          <div style={{marginTop:2}}>Reglas: 23 · AML: 5</div>
+          <div style={{marginTop:2}}>Modelo: GradientBoosting</div>
+        </div>
+      </div>
+
+      {/* MAIN */}
+      <div className="main">
+        {page==='dashboard' && <Dashboard entity={entity} toast={showToast}/>}
+        {page==='alerts'    && <Alerts entity={entity} showToast={showToast}/>}
+        {page==='profiles'  && <Profiles entity={entity} showToast={showToast}/>}
+        {page==='entities'  && <Entities onEntityChange={loadEntities} showToast={showToast}/>}
+        {page==='model'     && <ModelPage entity={entity} showToast={showToast}/>}
+      </div>
+
+      {toast && <Toast msg={toast.msg} type={toast.type}/>}
+    </div>
+  );
+}
+
+function var_(v) { return `var(${v})`; }
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
