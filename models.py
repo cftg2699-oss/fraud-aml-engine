@@ -406,3 +406,11 @@ class AlertFeedback(BaseModel):
     analyst_note:  Optional[str] = Field(None, example="Cliente viajó a Miami esta semana")
     analyst_id:    Optional[str] = Field(None, example="analyst_001")
     trigger_retrain: bool = Field(True, description="Re-entrenar el modelo con este label")
+
+# ═══════════════════════════════════════════════════════════════
+#  COMPATIBILITY ALIAS
+# ═══════════════════════════════════════════════════════════════
+
+# Permite que otros módulos sigan usando:
+# from models import Transaction
+Transaction = TransactionRecord
