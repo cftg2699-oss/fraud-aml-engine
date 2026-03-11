@@ -1,6 +1,6 @@
 """
-Fraud & AML Platform v2 — Backend completo
-Railway + PostgreSQL | 5 módulos | Score 0-999 | ML re-entrenable
+Fraud & AML Platform v3 — Multi-tenant con Auth
+Railway + PostgreSQL | Score 0-999 | ML | JWT Auth
 """
 import sys, os
 sys.path.insert(0, os.path.dirname(__file__))
@@ -20,9 +20,12 @@ from models import (
     Entity, Profile, TransactionRecord, Alert, ModelVersion,
     EntityCreate, TransactionIn, TransactionOut, AlertFeedback
 )
+from auth_models import User
+from auth_routes import router as auth_router
 from services.profile_service import get_or_create_profile, update_profile, build_profile_features
 from services.scoring_engine import evaluate
 from services import ml_service
+from services.auth_service import get_current_user, require_superadmin
 
 
 @asynccontextmanager
@@ -66,6 +69,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Auth router
+app.include_router(auth_router)
+
+def get_entity_filter(current_user: User) -> Optional[str]:
+    """Returns entity_code restriction for non-superadmins"""
+    if current_user.role == "superadmin":
+        return None  # sees everything
+    return current_user.entity_code
 
 
 # ═══════════════════════════════════════════════════════════
@@ -229,8 +241,11 @@ def list_profiles(
     risk_label:  Optional[str] = None,
     limit: int = Query(30, ge=1, le=200),
     offset: int = 0,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
+    if current_user.role != "superadmin":
+        entity_code = current_user.entity_code
     q = db.query(Profile)
     if entity_code:
         e = db.query(Entity).filter(Entity.code == entity_code).first()
@@ -277,8 +292,11 @@ def list_alerts(
     risk_level:  Optional[str] = None,
     limit:  int = Query(50, ge=1, le=500),
     offset: int = 0,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
+    if current_user.role != "superadmin":
+        entity_code = current_user.entity_code
     q = db.query(Alert)
     if entity_code:
         e = db.query(Entity).filter(Entity.code == entity_code).first()
@@ -421,7 +439,9 @@ def model_stats(db: Session = Depends(get_db)):
 # ═══════════════════════════════════════════════════════════
 
 @app.get("/api/v2/stats", tags=["Dashboard"])
-def get_stats(entity_code: Optional[str] = None, db: Session = Depends(get_db)):
+def get_stats(entity_code: Optional[str] = None, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if current_user.role != "superadmin" and not entity_code:
+        entity_code = current_user.entity_code
     q  = db.query(TransactionRecord)
     qa = db.query(Alert)
     qp = db.query(Profile)
@@ -501,7 +521,10 @@ def get_stats(entity_code: Optional[str] = None, db: Session = Depends(get_db)):
 @app.get("/api/v2/feed", tags=["Dashboard"])
 def get_feed(limit: int = Query(20, ge=1, le=100),
              entity_code: Optional[str] = None,
-             db: Session = Depends(get_db)):
+             db: Session = Depends(get_db),
+             current_user: User = Depends(get_current_user)):
+    if current_user.role != "superadmin":
+        entity_code = current_user.entity_code
     """Últimas transacciones para el feed en tiempo real"""
     q = db.query(TransactionRecord)
     if entity_code:
@@ -603,3 +626,4 @@ def simulate(
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+
