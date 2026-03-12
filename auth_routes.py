@@ -197,124 +197,151 @@ def setup_superadmin(data: RegisterRequest, db: Session = Depends(get_db)):
 @router.post("/upload")
 async def upload_transactions(
     file: UploadFile = File(...),
+    mapping: str = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Carga masiva de transacciones desde Excel.
-    Columnas requeridas: tx_id, amount, channel, cardholder, city, datetime, account_number
-    Columnas opcionales (solo TRANSFER): dest_account, dest_name
+    Carga masiva con mapeo dinámico de columnas (detectado por IA en el frontend).
+    mapping: JSON string {"amount":"col_excel","channel":"col_excel",...}
     """
     try:
-        import openpyxl
+        import openpyxl, json as _json
     except ImportError:
-        raise HTTPException(500, "openpyxl no instalado en el servidor")
+        raise HTTPException(500, "openpyxl no instalado")
 
-    if not file.filename.endswith((".xlsx", ".xls")):
-        raise HTTPException(400, "Solo se aceptan archivos Excel (.xlsx)")
+    if not file.filename.lower().endswith((".xlsx", ".xls")):
+        raise HTTPException(400, "Solo se aceptan .xlsx / .xls")
 
     entity_code = current_user.entity_code
     if not entity_code and current_user.role != "superadmin":
         raise HTTPException(403, "Tu cuenta no tiene entidad asignada")
+
+    col_map = {}
+    if mapping:
+        try:
+            col_map = _json.loads(mapping)
+        except Exception:
+            col_map = {}
 
     contents = await file.read()
     try:
         wb = openpyxl.load_workbook(io.BytesIO(contents), data_only=True)
         ws = wb.active
     except Exception as e:
-        raise HTTPException(400, f"No se pudo leer el archivo Excel: {str(e)}")
+        raise HTTPException(400, f"No se pudo leer el archivo: {str(e)}")
 
-    # Leer headers
-    headers = [str(cell.value or "").strip().lower() for cell in ws[1]]
-    required = {"tx_id", "amount", "channel", "cardholder", "city", "datetime", "account_number"}
-    missing = required - set(headers)
-    if missing:
-        raise HTTPException(400, f"Columnas faltantes: {', '.join(sorted(missing))}")
+    raw_headers = [str(cell.value or "").strip() for cell in ws[1]]
+    headers_lower = [h.lower() for h in raw_headers]
 
-    def col(row, name):
-        try:
-            idx = headers.index(name)
-            return row[idx].value
-        except (ValueError, IndexError):
-            return None
+    def get_col(row, field_name):
+        if field_name in col_map and col_map[field_name]:
+            mapped_col = col_map[field_name]
+            try:
+                idx = raw_headers.index(mapped_col)
+                return row[idx].value
+            except (ValueError, IndexError):
+                pass
+        aliases = {
+            "amount":         ["amount","monto","valor","importe","total","cantidad"],
+            "channel":        ["channel","canal","tipo","type","medio"],
+            "cardholder":     ["cardholder","titular","nombre","name","cliente"],
+            "account_number": ["account_number","account","cuenta","tarjeta","card","numero"],
+            "tx_id":          ["tx_id","txid","id","transaccion","transaction_id","referencia"],
+            "city":           ["city","ciudad","localidad","location","ubicacion"],
+            "datetime":       ["datetime","date","fecha","timestamp","hora"],
+            "dest_account":   ["dest_account","cuenta_destino","destino","to_account","beneficiario_cuenta"],
+            "dest_name":      ["dest_name","nombre_destino","beneficiario","beneficiary","to_name"],
+        }
+        for alias in aliases.get(field_name, [field_name]):
+            try:
+                idx = headers_lower.index(alias.lower())
+                return row[idx].value
+            except ValueError:
+                pass
+        return None
 
-    VALID_CHANNELS = {"CARD", "TRANSFER", "ATM", "WALLET"}
+    VALID_CHANNELS = {"CARD","TRANSFER","ATM","WALLET","DIGITAL_BANKING"}
+    CH_ALIASES = {
+        "BANCA_DIGITAL":"DIGITAL_BANKING","ONLINE":"DIGITAL_BANKING","INTERNET":"DIGITAL_BANKING",
+        "WEB":"DIGITAL_BANKING","APP":"DIGITAL_BANKING","MOBILE":"DIGITAL_BANKING",
+        "TRANSFERENCIA":"TRANSFER","TARJETA":"CARD","CAJERO":"ATM","BILLETERA":"WALLET",
+    }
 
-    results = []
-    errors  = []
-    saved   = 0
+    results, errors, saved = [], [], 0
 
     for i, row in enumerate(ws.iter_rows(min_row=2), start=2):
         if all(c.value is None for c in row):
-            continue  # fila vacía
+            continue
 
-        tx_id      = str(col(row, "tx_id") or "").strip()
-        raw_amount = col(row, "amount")
-        channel    = str(col(row, "channel") or "").upper().strip()
-        cardholder = str(col(row, "cardholder") or "").strip()
-        city       = str(col(row, "city") or "").strip()
-        dt_raw     = col(row, "datetime")
-        account    = str(col(row, "account_number") or "").strip()
-        dest_acc   = str(col(row, "dest_account") or "").strip() if "dest_account" in headers else ""
-        dest_name  = str(col(row, "dest_name") or "").strip() if "dest_name" in headers else ""
+        raw_amount  = get_col(row, "amount")
+        channel_raw = str(get_col(row, "channel") or "").upper().strip()
+        cardholder  = str(get_col(row, "cardholder") or "").strip()
+        account     = str(get_col(row, "account_number") or "").strip()
+        tx_id_raw   = get_col(row, "tx_id")
+        city        = str(get_col(row, "city") or "").strip()
+        dt_raw      = get_col(row, "datetime")
+        dest_acc    = str(get_col(row, "dest_account") or "").strip()
+        dest_name_v = str(get_col(row, "dest_name") or "").strip()
 
-        # Validaciones básicas
+        tx_id = str(tx_id_raw or "").strip() or f"UP-{uuid.uuid4().hex[:8].upper()}"
+
         row_errors = []
-        if not tx_id:
-            tx_id = f"UP-{uuid.uuid4().hex[:8].upper()}"
         try:
-            amount = float(str(raw_amount).replace(",", "."))
+            amount_str = str(raw_amount or "").replace(",", ".").strip()
+            amount = float(amount_str)
             if amount <= 0:
                 row_errors.append("amount debe ser > 0")
-        except:
-            row_errors.append(f"amount inválido: {raw_amount}")
+        except Exception:
+            row_errors.append(f"amount inválido: '{raw_amount}'")
             amount = 0
 
+        channel = CH_ALIASES.get(channel_raw, channel_raw)
         if channel not in VALID_CHANNELS:
-            row_errors.append(f"channel '{channel}' inválido (usa: CARD, TRANSFER, ATM, WALLET)")
+            for vc in VALID_CHANNELS:
+                if vc in channel or channel in vc:
+                    channel = vc
+                    break
+            else:
+                row_errors.append(f"channel '{channel_raw}' inválido. Usa: CARD, TRANSFER, ATM, WALLET, DIGITAL_BANKING")
+
+        if not cardholder:
+            row_errors.append("cardholder (titular) requerido")
+        if not account:
+            account = f"ACC-{i}"
 
         if row_errors:
             errors.append({"row": i, "tx_id": tx_id, "errors": row_errors})
             continue
 
-        # Parsear fecha
         if isinstance(dt_raw, datetime):
             tx_dt = dt_raw
         else:
             try:
-                tx_dt = datetime.fromisoformat(str(dt_raw))
-            except:
+                tx_dt = datetime.fromisoformat(str(dt_raw).replace(" ", "T"))
+            except Exception:
                 tx_dt = datetime.utcnow()
 
-        # Construir payload para el motor de scoring
         payload = {
             "entity_code":    entity_code or "DEMO",
             "tx_id":          tx_id,
             "amount":         amount,
             "channel":        channel,
-            "subtype":        "TRANSFER" if channel == "TRANSFER" else channel,
+            "subtype":        channel,
             "cardholder":     cardholder,
-            "city":           city,
+            "city":           city or "Desconocida",
             "account_number": account,
             "created_at":     tx_dt.isoformat(),
+            "dest_account":   dest_acc,
+            "dest_name":      dest_name_v,
         }
-        if channel == "TRANSFER":
-            payload["dest_account"] = dest_acc
-            payload["dest_name"]    = dest_name
-
         results.append(payload)
 
-    if not results:
-        return {
-            "status": "error",
-            "message": "No se procesó ninguna fila válida",
-            "errors": errors
-        }
+    if not results and errors:
+        return {"status":"error","message":"No se procesó ninguna fila válida",
+                "total":len(errors),"saved":0,"errors":len(errors),"error_detail":errors[:20],"scored":[]}
 
-    # Llamar al motor de scoring interno
-    # Importamos aquí para evitar importaciones circulares
     from main import score_transaction_internal
-
     scored = []
     for payload in results:
         try:
@@ -332,12 +359,12 @@ async def upload_transactions(
             errors.append({"tx_id": payload["tx_id"], "errors": [str(e)]})
 
     return {
-        "status":  "ok",
-        "total":   len(results) + len(errors),
-        "saved":   saved,
-        "errors":  len(errors),
-        "error_detail": errors[:20],  # máximo 20 errores detallados
-        "scored":  scored[:200],       # preview de hasta 200 resultados
+        "status":       "ok",
+        "total":        len(results) + len(errors),
+        "saved":        saved,
+        "errors":       len(errors),
+        "error_detail": errors[:20],
+        "scored":       scored[:200],
     }
 
 
@@ -350,7 +377,7 @@ def download_template():
         "columns": [
             {"name": "tx_id",           "type": "texto",   "required": True,  "example": "TXN-001",         "description": "ID único de la transacción"},
             {"name": "amount",          "type": "número",  "required": True,  "example": "1500.00",         "description": "Monto en USD"},
-            {"name": "channel",         "type": "texto",   "required": True,  "example": "CARD",            "description": "CARD | TRANSFER | ATM | WALLET"},
+            {"name": "channel",         "type": "texto",   "required": True,  "example": "CARD",            "description": "CARD | TRANSFER | ATM | WALLET | DIGITAL_BANKING"},
             {"name": "cardholder",      "type": "texto",   "required": True,  "example": "Juan Pérez",      "description": "Nombre del titular"},
             {"name": "city",            "type": "texto",   "required": True,  "example": "Guayaquil",       "description": "Ciudad de la transacción"},
             {"name": "datetime",        "type": "fecha",   "required": True,  "example": "2024-01-15 14:30","description": "Fecha y hora (YYYY-MM-DD HH:MM)"},
@@ -361,7 +388,7 @@ def download_template():
         "notes": [
             "Las columnas dest_account y dest_name solo son necesarias para transacciones de tipo TRANSFER",
             "El campo tx_id debe ser único por entidad",
-            "El campo channel solo acepta: CARD, TRANSFER, ATM, WALLET",
+            "El campo channel acepta: CARD, TRANSFER, ATM, WALLET, DIGITAL_BANKING. El sistema también reconoce aliases como BANCA_DIGITAL, ONLINE, APP, etc.",
             "Las fechas deben estar en formato YYYY-MM-DD HH:MM o YYYY-MM-DDTHH:MM:SS",
         ]
     }
