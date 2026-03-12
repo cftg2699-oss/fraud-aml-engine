@@ -452,6 +452,11 @@ function Alerts({entity, channel, showToast}) {
   const [note,     setNote]     = useState('');
   const [submitting, setSubmit] = useState(false);
 
+  // Log transaccional 8 días
+  const [rightTab,  setRightTab]  = useState('perfil'); // 'perfil' | 'txlog'
+  const [txLog,     setTxLog]     = useState([]);
+  const [txLoading, setTxLoading] = useState(false);
+
   const loadAlerts = useCallback(async () => {
     try {
       const chA=channel&&channel!=='ALL'?'&channel='+channel:'';
@@ -462,13 +467,29 @@ function Alerts({entity, channel, showToast}) {
 
   useEffect(() => { setLoad(true); loadAlerts(); }, [loadAlerts]);
 
-  const selectAlert = async (a) => {
-    setSel(a.id); setDetail(null); setLabel(null); setNote(''); setDLoad(true);
+  const loadTxLog = useCallback(async (profileId, entityCode) => {
+    if (!profileId) return;
+    setTxLoading(true); setTxLog([]);
     try {
-      const d = await api(`/api/v2/alerts/${a.id}`);
+      const entQ = entityCode ? '&entity_code=' + entityCode : '';
+      const d = await api('/api/v2/transactions?profile_id=' + profileId + '&days=8&limit=200' + entQ);
+      setTxLog(d.data || []);
+    } catch(e) { showToast('Error cargando log: ' + e.message, 'err'); }
+    setTxLoading(false);
+  }, [showToast]);
+
+  const selectAlert = useCallback(async (a) => {
+    setSel(a.id); setDLoad(true); setLabel(null); setNote('');
+    setRightTab('perfil'); setTxLog([]);
+    try {
+      const d = await api('/api/v2/alerts/' + a.id);
       setDetail(d); setDLoad(false);
-    } catch(e) { setDLoad(false); showToast('Error cargando detalle','err'); }
-  };
+      // Precargar log transaccional si hay profile_id
+      if (d.alert?.profile_id) {
+        loadTxLog(d.alert.profile_id, entity);
+      }
+    } catch(e) { setDLoad(false); showToast('Error: ' + e.message, 'err'); }
+  }, [entity, loadTxLog, showToast]);
 
   const submitFeedback = async () => {
     if (!label || !selected) return;
@@ -644,12 +665,30 @@ function Alerts({entity, channel, showToast}) {
         })()}
       </div>
 
-      {/* RIGHT: Perfil + Feedback */}
+      {/* RIGHT: Perfil + Log + Feedback */}
       {selected && detail && (() => {
         const {alert:al, profile:p} = detail;
         const alreadyLabeled = al?.feedback?.status && !['PENDING','UNDER_REVIEW'].includes(al.feedback.status);
         return (
           <div className="split-right">
+
+            {/* TABS */}
+            <div style={{display:'flex',borderBottom:'1px solid var(--border)',background:'var(--bg3)'}}>
+              {[['perfil','👤 Perfil'],['txlog','📋 Log 8d']].map(([t,l])=>(
+                <button key={t} onClick={()=>setRightTab(t)}
+                  style={{flex:1,padding:'8px 4px',fontSize:9,fontFamily:'var(--mono)',border:'none',cursor:'pointer',
+                    background: rightTab===t ? 'var(--bg2)' : 'transparent',
+                    color: rightTab===t ? 'var(--teal)' : 'var(--slate)',
+                    borderBottom: rightTab===t ? '2px solid var(--teal)' : '2px solid transparent',
+                    fontWeight: rightTab===t ? 700 : 400}}>
+                  {l}
+                  {t==='txlog' && txLog.length > 0 && <span style={{marginLeft:4,background:'var(--teal)',color:'#000',borderRadius:8,padding:'1px 5px',fontSize:7}}>{txLog.length}</span>}
+                </button>
+              ))}
+            </div>
+
+            {/* TAB: PERFIL */}
+            {rightTab === 'perfil' && (<>
             {/* Perfil */}
             {p ? (
               <>
@@ -755,6 +794,108 @@ function Alerts({entity, channel, showToast}) {
                 </>
               )}
             </div>
+            </>)}
+
+            {/* TAB: LOG TRANSACCIONAL 8 DÍAS */}
+            {rightTab === 'txlog' && (
+              <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+                <div style={{padding:'10px 14px',borderBottom:'1px solid var(--border)',background:'var(--bg3)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                  <div>
+                    <div style={{fontFamily:'var(--sans)',fontSize:11,fontWeight:700,color:'var(--white)'}}>Log transaccional · 8 días</div>
+                    <div style={{fontSize:8,color:'var(--slate)',marginTop:1}}>
+                      {p ? (p.identity_type + ' · ' + p.identity_value) : 'Cliente de esta alerta'}
+                    </div>
+                  </div>
+                  <div style={{textAlign:'right'}}>
+                    <div style={{fontFamily:'var(--sans)',fontSize:16,fontWeight:800,color:'var(--teal)'}}>{txLoading ? '…' : txLog.length}</div>
+                    <div style={{fontSize:7,color:'var(--slate)'}}>transacciones</div>
+                  </div>
+                </div>
+
+                {txLoading && (
+                  <div className="center" style={{padding:30,color:'var(--slate)',fontSize:10}}>
+                    <Spinner/> Cargando historial...
+                  </div>
+                )}
+
+                {!txLoading && txLog.length === 0 && (
+                  <div className="center" style={{padding:30,color:'var(--slate)',fontSize:10}}>
+                    Sin transacciones en los últimos 8 días
+                  </div>
+                )}
+
+                {!txLoading && txLog.length > 0 && (
+                  <div style={{flex:1,overflowY:'auto'}}>
+                    {/* Resumen rápido */}
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:1,background:'var(--bg3)',borderBottom:'1px solid var(--border)'}}>
+                      {[
+                        ['Total TX',  txLog.length, 'var(--teal)'],
+                        ['Volumen',   fmtAmt(txLog.reduce((s,t)=>s+(t.amount||0),0)), 'var(--amber)'],
+                        ['Alto riesgo', txLog.filter(t=>['HIGH','CRITICAL'].includes(t.scoring?.risk_level)).length, 'var(--red)'],
+                      ].map(([l,v,c])=>(
+                        <div key={l} style={{padding:'8px 10px',textAlign:'center'}}>
+                          <div style={{fontFamily:'var(--sans)',fontSize:14,fontWeight:800,color:c}}>{v}</div>
+                          <div style={{fontSize:7,color:'var(--slate)',marginTop:1}}>{l}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Tabla */}
+                    <table style={{width:'100%',borderCollapse:'collapse',fontSize:8}}>
+                      <thead>
+                        <tr style={{background:'var(--bg3)',position:'sticky',top:0}}>
+                          {['Fecha','Canal','Monto','Score','Decisión'].map(h=>(
+                            <th key={h} style={{padding:'5px 8px',textAlign:'left',fontFamily:'var(--mono)',fontSize:7,color:'var(--slate)',letterSpacing:'.08em',borderBottom:'1px solid var(--border)',fontWeight:600}}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {txLog.map((t,idx)=>{
+                          const sc   = t.scoring?.score_final || 0;
+                          const dec  = t.scoring?.decision || '';
+                          const rl   = t.scoring?.risk_level || '';
+                          const rowBg = rl==='CRITICAL'?'rgba(255,59,92,.06)':rl==='HIGH'?'rgba(245,158,11,.05)':'transparent';
+                          return (
+                            <tr key={t.tx_id||idx} style={{background:rowBg,borderBottom:'1px solid rgba(255,255,255,.03)'}}>
+                              <td style={{padding:'5px 8px',fontFamily:'var(--mono)',color:'var(--slate)',whiteSpace:'nowrap'}}>
+                                {t.created_at ? t.created_at.slice(0,16).replace('T',' ') : '—'}
+                              </td>
+                              <td style={{padding:'5px 8px'}}>
+                                <span style={{background:'var(--bg4)',border:'1px solid var(--border2)',borderRadius:3,padding:'1px 4px',fontFamily:'var(--mono)',fontSize:7,color:'var(--light)'}}>{t.channel}</span>
+                              </td>
+                              <td style={{padding:'5px 8px',fontFamily:'var(--sans)',fontWeight:700,color:'var(--white)'}}>{fmtAmt(t.amount)}</td>
+                              <td style={{padding:'5px 8px',fontFamily:'var(--sans)',fontWeight:700,color:scoreColor(sc)}}>{sc}</td>
+                              <td style={{padding:'5px 8px'}}>
+                                <span className={`badge ${rl||'LOW'}`} style={{fontSize:6,padding:'1px 4px'}}>
+                                  {dec || rl || '—'}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+
+                    {/* Reglas disparadas en la TX de esta alerta */}
+                    {detail?.transaction?.rules_triggered?.length > 0 && (
+                      <div style={{padding:'10px 14px',borderTop:'1px solid var(--border)'}}>
+                        <div style={{fontSize:8,color:'var(--slate)',letterSpacing:'.1em',textTransform:'uppercase',marginBottom:6}}>Reglas disparadas en esta TX</div>
+                        {detail.transaction.rules_triggered.map((r,i)=>(
+                          <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'4px 0',borderBottom:'1px solid rgba(255,255,255,.04)'}}>
+                            <div>
+                              <div style={{fontSize:8,color:'var(--light)',fontWeight:600}}>{r.name}</div>
+                              <div style={{fontSize:7,color:'var(--slate)'}}>{r.description}</div>
+                            </div>
+                            <span style={{fontFamily:'var(--sans)',fontSize:11,fontWeight:800,color:scoreColor(r.points),minWidth:32,textAlign:'right'}}>+{r.points}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
           </div>
         );
       })()}
@@ -2506,17 +2647,39 @@ function RuleRow({rule, editingId, editVals, setEditVals, onToggle, onEdit, onSa
 }
 
 
-function NetworkGraph({deviceAlerts, channel, showToast}) {
+function NetworkGraph({deviceAlerts, channel, entity, showToast}) {
   const svgRef = useRef(null);
-  const [tooltip, setTooltip] = React.useState(null);
+  const [tooltip,      setTooltip]      = React.useState(null);
   const [selectedNode, setSelectedNode] = React.useState(null);
-  const [filter, setFilter] = React.useState('ALL');
-  const [zoom, setZoom] = React.useState(1);
+  const [filter,       setFilter]       = React.useState('ALL');
+  const [zoom,         setZoom]         = React.useState(1);
 
-  // Construir grafo desde deviceAlerts
+  // Alertas reales del backend (8 días, canal activo)
+  const [backendAlerts, setBackendAlerts] = React.useState([]);
+  const [loading,       setLoading]       = React.useState(false);
+  const [lastChannel,   setLastChannel]   = React.useState(null);
+
+  const loadBackendAlerts = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const chQ    = (channel && channel !== 'ALL') ? '&channel=' + channel : '';
+      const entQ   = entity ? '&entity_code=' + entity : '';
+      const d = await api('/api/v2/alerts?status=ALL&limit=300&days=8' + chQ + entQ);
+      setBackendAlerts(d.data || []);
+      setLastChannel(channel);
+    } catch(e) {
+      showToast('Error cargando red: ' + e.message, 'err');
+    }
+    setLoading(false);
+  }, [channel, entity]);
+
+  useEffect(() => { loadBackendAlerts(); }, [loadBackendAlerts]);
+
+  // Mapear alerta backend → nodo de grafo (incluye identity_value del perfil)
+  // También incorporar deviceAlerts del análisis offline
   const buildGraph = React.useCallback(() => {
-    const nodes = [];
-    const links = [];
+    const nodes  = [];
+    const links  = [];
     const nodeMap = {};
 
     const addNode = (id, type, label, risk, meta) => {
@@ -2527,30 +2690,66 @@ function NetworkGraph({deviceAlerts, channel, showToast}) {
       return nodeMap[id];
     };
 
-    const alerts = filter === 'ALL'
+    // ── Fuente 1: alertas del backend (transaccionales) ──────────
+    const sevMap = {CRITICAL: 'CRITICO', HIGH: 'ALTO', MEDIUM: 'MEDIO', LOW: 'BAJO'};
+    const riskMap = {CRITICAL: 850, HIGH: 550, MEDIUM: 350, LOW: 100};
+
+    const bFiltered = filter === 'ALL'
+      ? backendAlerts
+      : backendAlerts.filter(a => sevMap[a.risk_level] === filter);
+
+    bFiltered.forEach(a => {
+      const alertId = 'balert_' + a.id;
+      const risk    = riskMap[a.risk_level] || 200;
+      const label   = (a.cardholder || a.top_rule || 'Alerta').slice(0, 28);
+      const alertNode = addNode(alertId, 'alert', label, risk, {
+        type: a.channel, severity: sevMap[a.risk_level] || a.risk_level,
+        detail: a.top_rule || a.decision,
+        score: a.score_final, channel: a.channel,
+        amount: a.amount, city: a.city,
+      });
+
+      // Nodo cuenta (identity_value del perfil si disponible)
+      if (a.profile_id) {
+        const accId   = 'acc_' + a.profile_id;
+        const accNode = addNode(accId, 'account', 'ID:' + a.profile_id, 0, {profile_id: a.profile_id});
+        links.push({source: alertId, target: accId, type: a.channel || 'TX'});
+        alertNode.connections++;
+        accNode.connections++;
+        accNode.risk = Math.max(accNode.risk, risk * 0.6);
+      }
+
+      // Agrupar por canal (nodo canal como hub)
+      if (a.channel) {
+        const chId   = 'ch_' + a.channel;
+        const chNode = addNode(chId, 'channel', a.channel, 0, {channel: a.channel});
+        links.push({source: alertId, target: chId, type: 'CANAL'});
+        alertNode.connections++;
+        chNode.connections++;
+        chNode.risk = Math.max(chNode.risk, risk * 0.3);
+      }
+    });
+
+    // ── Fuente 2: deviceAlerts offline (análisis sesiones) ───────
+    const devFiltered = filter === 'ALL'
       ? deviceAlerts
       : deviceAlerts.filter(a => a.severity === filter);
 
-    alerts.forEach(alert => {
-      // Nodo central del alerta
-      const alertId = 'alert_' + alert.id;
+    devFiltered.forEach(alert => {
+      const alertId   = 'dalert_' + alert.id;
       const alertNode = addNode(alertId, 'alert', alert.title.slice(0,30), alert.risk, {
-        type: alert.type, severity: alert.severity, detail: alert.detail
+        type: alert.type, severity: alert.severity, detail: alert.detail, source: 'device'
       });
-
-      // Nodos de cuentas
       (alert.accounts||[]).forEach(acc => {
-        const accId = 'acc_' + acc;
+        const accId   = 'acc_d_' + acc;
         const accNode = addNode(accId, 'account', acc.slice(0,20), 0, {account: acc});
         links.push({source: alertId, target: accId, type: alert.type});
         alertNode.connections++;
         accNode.connections++;
         accNode.risk = Math.max(accNode.risk, alert.risk * 0.6);
       });
-
-      // Nodos de IPs
       (alert.ips||[]).forEach(ip => {
-        const ipId = 'ip_' + ip;
+        const ipId   = 'ip_' + ip;
         const ipNode = addNode(ipId, 'ip', ip, 0, {ip});
         links.push({source: alertId, target: ipId, type: 'IP'});
         alertNode.connections++;
@@ -2560,7 +2759,7 @@ function NetworkGraph({deviceAlerts, channel, showToast}) {
     });
 
     return {nodes, links};
-  }, [deviceAlerts, filter]);
+  }, [backendAlerts, deviceAlerts, filter]);
 
   // Renderizar con D3 force simulation
   useEffect(() => {
@@ -2701,31 +2900,55 @@ function NetworkGraph({deviceAlerts, channel, showToast}) {
   }, [buildGraph]);
 
   const graph = buildGraph();
-  const alertNodes  = graph.nodes.filter(n => n.type === 'alert').length;
+  const alertNodes   = graph.nodes.filter(n => n.type === 'alert').length;
   const accountNodes = graph.nodes.filter(n => n.type === 'account').length;
-  const ipNodes     = graph.nodes.filter(n => n.type === 'ip').length;
-  const critNodes   = graph.nodes.filter(n => n.risk >= 700).length;
+  const ipNodes      = graph.nodes.filter(n => n.type === 'ip').length;
+  const critNodes    = graph.nodes.filter(n => n.risk >= 700).length;
 
   const sevColor = s => s==='CRITICO'?'var(--red)':s==='ALTO'?'var(--amber)':'var(--orange)';
+  const chLabel  = (!channel || channel === 'ALL') ? 'Todos los canales' : channel;
 
   return (
     <div>
-      <div className="page-title">Red de Riesgo</div>
-      <div className="page-sub">Mapa interactivo de compromisos — nodos, cuentas e IPs relacionadas</div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
+        <div>
+          <div className="page-title">Red de Riesgo</div>
+          <div className="page-sub">
+            Últimos 8 días · Canal: <span style={{color:'var(--teal)',fontFamily:'var(--mono)'}}>{chLabel}</span>
+            {loading && <span style={{marginLeft:8,color:'var(--slate)'}}> Cargando...</span>}
+            {!loading && <span style={{marginLeft:8,color:'var(--slate)'}}>· {backendAlerts.length} alertas + {deviceAlerts.length} dispositivos</span>}
+          </div>
+        </div>
+        <button className="btn btn-ghost" style={{fontSize:9,padding:'4px 12px'}} onClick={loadBackendAlerts} disabled={loading}>
+          ↻ Refrescar
+        </button>
+      </div>
 
-      {deviceAlerts.length === 0 && (
+      {!loading && graph.nodes.length === 0 && (
         <div className="card" style={{textAlign:'center',padding:'60px',opacity:.5}}>
           <div style={{fontSize:40,marginBottom:12}}>🕸</div>
-          <div style={{fontSize:12,color:'var(--slate)'}}>Sin datos de red</div>
-          <div style={{fontSize:10,color:'var(--border2)',marginTop:6}}>Carga un archivo de sesiones en Carga Masiva para generar la red</div>
+          <div style={{fontSize:12,color:'var(--slate)'}}>Sin datos de red para este canal</div>
+          <div style={{fontSize:10,color:'var(--border2)',marginTop:6}}>
+            {(!channel||channel==='ALL')
+              ? 'Envía transacciones para generar alertas, o carga sesiones en Carga Masiva'
+              : 'Sin alertas en canal ' + channel + ' en los últimos 8 días'}
+          </div>
         </div>
       )}
 
-      {deviceAlerts.length > 0 && (<>
+      {(loading || graph.nodes.length > 0) && (<>
         {/* KPIs */}
         <div className="grid-4" style={{marginBottom:14}}>
-          {[['Nodos alerta',alertNodes,'var(--red)'],['Cuentas',accountNodes,'var(--blue)'],['IPs',ipNodes,'var(--purple)'],['Riesgo critico',critNodes,'var(--red)']].map(([l,v,c])=>(
-            <div className="card" key={l}><div className="card-title">{l}</div><div style={{fontFamily:'var(--sans)',fontSize:24,fontWeight:800,color:c}}>{v}</div></div>
+          {[
+            ['Alertas en red', alertNodes,   'var(--red)'],
+            ['Cuentas',        accountNodes, 'var(--blue)'],
+            ['IPs / Canales',  ipNodes + graph.nodes.filter(n=>n.type==='channel').length, 'var(--purple)'],
+            ['Riesgo crítico', critNodes,    'var(--red)'],
+          ].map(([l,v,c])=>(
+            <div className="card" key={l}>
+              <div className="card-title">{l}</div>
+              <div style={{fontFamily:'var(--sans)',fontSize:24,fontWeight:800,color:c}}>{loading?'…':v}</div>
+            </div>
           ))}
         </div>
 
@@ -2974,7 +3197,7 @@ function App() {
         {page==='dashboard'&&<Dashboard entity={activeEntity} channel={channel} toast={showToast}/>}
         {page==='alerts'&&<Alerts entity={activeEntity} channel={channel} showToast={showToast}/>}
         {page==='other_alerts'&&<OtherAlerts alerts={deviceAlerts} setAlerts={setDeviceAlerts} showToast={showToast}/>}
-        {page==='network'&&<NetworkGraph deviceAlerts={deviceAlerts} channel={channel} showToast={showToast}/>}
+        {page==='network'&&<NetworkGraph deviceAlerts={deviceAlerts} channel={channel} entity={activeEntity} showToast={showToast}/>}
         {page==='profiles'&&<Profiles entity={activeEntity} channel={channel} showToast={showToast}/>}
         {page==='upload'&&<UploadPage entity={activeEntity} showToast={showToast} onDeviceResult={onDeviceResult}/>}
         {page==='entities'&&<Entities onEntityChange={loadEntities} showToast={showToast}/>}
