@@ -398,7 +398,7 @@ function Dashboard({entity, channel, toast}) {
       <div className="card" style={{marginBottom:16}}>
         <div className="card-title">Distribución por canal</div>
         <div className="grid-4" style={{marginTop:8}}>
-          {[['CARD','💳'],['TRANSFER','🏦'],['WALLET','📱'],['ATM','🏧']].map(([ch,ic])=>(
+          {[['CARD','💳'],['TRANSFER','🏦'],['WALLET','📱'],['ATM','🏧'],['DIGITAL_BANKING','💻']].map(([ch,ic])=>(
             <div key={ch} style={{background:'var(--bg3)',borderRadius:6,padding:'10px 12px',textAlign:'center'}}>
               <div style={{fontSize:20,marginBottom:4}}>{ic}</div>
               <div style={{fontFamily:'var(--sans)',fontSize:20,fontWeight:800,color:'var(--white)'}}>{(stats.by_channel[ch]||0).toLocaleString()}</div>
@@ -2199,7 +2199,7 @@ const DEFAULT_RULES = {
   ],
 };
 
-function RulesEditor({channel, showToast}) {
+function RulesEditor({channel, entity, showToast}) {
   const storageKey = 'rules_config';
   const [rules, setRules] = React.useState(() => {
     try {
@@ -2212,6 +2212,42 @@ function RulesEditor({channel, showToast}) {
   const [editingId, setEditingId] = React.useState(null);
   const [editVals, setEditVals] = React.useState({});
   const [saving, setSaving] = React.useState(false);
+
+  // Pesos del scoring (se leen y escriben en la entidad del backend)
+  const [weights, setWeights] = React.useState({rules: 0.4, ml: 0.6});
+  const [weightsLoaded, setWeightsLoaded] = React.useState(false);
+  const [savingWeights, setSavingWeights] = React.useState(false);
+  const [editWeights, setEditWeights] = React.useState(false);
+  const [wEdit, setWEdit] = React.useState({rules: 0.4, ml: 0.6});
+
+  // Cargar pesos actuales de la entidad
+  React.useEffect(() => {
+    if (!entity) return;
+    api('/api/v2/entities').then(d => {
+      const ent = (d.entities||[]).find(e => e.code === entity);
+      if (ent && ent.weights) {
+        setWeights({rules: ent.weights.rules||0.4, ml: ent.weights.ml||0.6});
+        setWEdit({rules: ent.weights.rules||0.4, ml: ent.weights.ml||0.6});
+      }
+      setWeightsLoaded(true);
+    }).catch(() => setWeightsLoaded(true));
+  }, [entity]);
+
+  const saveWeights = async () => {
+    const r = parseFloat(wEdit.rules)||0;
+    const m = parseFloat(wEdit.ml)||0;
+    if (Math.abs(r + m - 1.0) > 0.01) {
+      showToast('Los pesos deben sumar exactamente 1.0', 'err'); return;
+    }
+    setSavingWeights(true);
+    try {
+      await api('/api/v2/entities/'+entity, {method:'PATCH', body:{weight_rules: r, weight_ml: m}});
+      setWeights({rules: r, ml: m});
+      setEditWeights(false);
+      showToast('Pesos guardados en el backend', 'ok');
+    } catch(e) { showToast('Error: '+e.message, 'err'); }
+    setSavingWeights(false);
+  };
 
   // Canal activo para mostrar reglas
   const activeChannel = channel && channel !== 'ALL' ? channel : null;
@@ -2277,6 +2313,69 @@ function RulesEditor({channel, showToast}) {
         <span style={{color:'var(--teal)'}}>
           {activeChannel ? activeChannel : 'TODOS LOS CANALES'}
         </span>
+      </div>
+
+      {/* Panel de Pesos — conectado al backend */}
+      <div className="card" style={{marginBottom:14, border:'1px solid rgba(59,130,246,.25)'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+          <div>
+            <div style={{fontFamily:'var(--sans)',fontSize:13,fontWeight:700,color:'var(--white)',marginBottom:2}}>
+              Pesos del scoring
+            </div>
+            <div style={{fontSize:9,color:'var(--slate)'}}>
+              score_final = score_reglas &times; <span style={{color:'var(--teal)',fontWeight:700}}>{weights.rules}</span>
+              {' '}+{' '}score_ML &times; <span style={{color:'var(--purple)',fontWeight:700}}>{weights.ml}</span>
+            </div>
+          </div>
+          <div style={{display:'flex',gap:6,alignItems:'center'}}>
+            {!weightsLoaded && <span style={{fontSize:9,color:'var(--slate)'}}>Cargando...</span>}
+            {!entity && <span style={{fontSize:9,color:'var(--amber)'}}>Selecciona entidad para editar</span>}
+            {entity && !editWeights && (
+              <button className="btn btn-ghost" style={{padding:'4px 12px',fontSize:9}} onClick={()=>setEditWeights(true)}>
+                Editar pesos
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Barra visual de pesos */}
+        <div style={{height:24,borderRadius:6,overflow:'hidden',display:'flex',marginBottom:10}}>
+          <div style={{width:(weights.rules*100)+'%',background:'var(--teal)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:700,color:'#000',transition:'width .4s'}}>
+            {weights.rules > 0.1 ? 'REGLAS '+Math.round(weights.rules*100)+'%' : ''}
+          </div>
+          <div style={{flex:1,background:'var(--purple)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:700,color:'#fff'}}>
+            {weights.ml > 0.1 ? 'ML '+Math.round(weights.ml*100)+'%' : ''}
+          </div>
+        </div>
+
+        {editWeights && entity && (
+          <div style={{background:'var(--bg3)',borderRadius:8,padding:'12px 14px',border:'1px solid var(--border2)'}}>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:10}}>
+              {[['Peso Reglas heurísticas','rules','var(--teal)'],['Peso Modelo ML','ml','var(--purple)']].map(([l,k,c])=>(
+                <div key={k}>
+                  <div style={{fontSize:8,color:c,letterSpacing:'.1em',marginBottom:4,textTransform:'uppercase'}}>{l}</div>
+                  <input type="number" min={0} max={1} step={0.05}
+                    value={wEdit[k]}
+                    onChange={e => {
+                      const v = parseFloat(e.target.value)||0;
+                      const other = k==='rules'?'ml':'rules';
+                      setWEdit(w => ({...w, [k]: v, [other]: Math.max(0, Math.round((1-v)*100)/100)}));
+                    }}
+                    style={{width:'100%',padding:'6px 8px',fontSize:11,border:'1px solid '+c+'60'}}/>
+                </div>
+              ))}
+            </div>
+            <div style={{fontSize:9,color:Math.abs(wEdit.rules+wEdit.ml-1)>0.01?'var(--red)':'var(--teal)',marginBottom:8}}>
+              Suma: {(wEdit.rules+wEdit.ml).toFixed(2)} {Math.abs(wEdit.rules+wEdit.ml-1)>0.01?'— deben sumar 1.0':'✓'}
+            </div>
+            <div style={{display:'flex',gap:8}}>
+              <button className="btn btn-teal" style={{padding:'5px 16px',fontSize:9}} disabled={savingWeights||Math.abs(wEdit.rules+wEdit.ml-1)>0.01} onClick={saveWeights}>
+                {savingWeights?'Guardando...':'Guardar en backend'}
+              </button>
+              <button className="btn btn-ghost" style={{padding:'5px 12px',fontSize:9}} onClick={()=>{setEditWeights(false);setWEdit(weights);}}>Cancelar</button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Stats */}
@@ -2879,7 +2978,7 @@ function App() {
         {page==='profiles'&&<Profiles entity={activeEntity} channel={channel} showToast={showToast}/>}
         {page==='upload'&&<UploadPage entity={activeEntity} showToast={showToast} onDeviceResult={onDeviceResult}/>}
         {page==='entities'&&<Entities onEntityChange={loadEntities} showToast={showToast}/>}
-        {page==='rules'&&<RulesEditor channel={channel} showToast={showToast}/>}
+        {page==='rules'&&<RulesEditor channel={channel} entity={activeEntity} showToast={showToast}/>}
         {page==='model'&&<ModelPage entity={activeEntity} showToast={showToast}/>}
       </div>
 
