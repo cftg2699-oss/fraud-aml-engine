@@ -1,195 +1,2269 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fraud & AML Platform | Enterprise</title>
-    
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛡️</text></svg>">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fraud & AML Platform</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#07080c;--bg2:#0c0e17;--bg3:#111420;--bg4:#181b2a;
+  --border:#1c2035;--border2:#252a42;
+  --red:#ff3b5c;--red2:#c42040;--red3:rgba(255,59,92,.12);
+  --amber:#f59e0b;--amber3:rgba(245,158,11,.12);
+  --teal:#14b8a6;--teal3:rgba(20,184,166,.12);
+  --blue:#3b82f6;--blue3:rgba(59,130,246,.12);
+  --purple:#a855f7;--purple3:rgba(168,85,247,.12);
+  --orange:#f97316;
+  --slate:#6b7280;--muted:#94a3b8;--light:#e2e8f0;--white:#f8fafc;
+  --mono:'DM Mono',monospace;--sans:'Syne',sans-serif;
+  --r:8px;--r2:12px;
+}
+html,body,#root{height:100%;background:var(--bg);color:var(--light);font-family:var(--mono);overflow:hidden}
+button{font-family:var(--mono);cursor:pointer}
+input,select,textarea{font-family:var(--mono);background:var(--bg3);border:1px solid var(--border2);color:var(--light);border-radius:5px;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--teal)}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
-    
-    <style>
-        /* (Mantenemos tus estilos originales que están excelentes) */
-        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-        :root{
-            --bg:#07080c;--bg2:#0c0e17;--bg3:#111420;--bg4:#181b2a;
-            --border:#1c2035;--border2:#252a42;
-            --red:#ff3b5c;--red2:#c42040;--red3:rgba(255,59,92,.12);
-            --amber:#f59e0b;--amber3:rgba(245,158,11,.12);
-            --teal:#14b8a6;--teal3:rgba(20,184,166,.12);
-            --blue:#3b82f6;--blue3:rgba(59,130,246,.12);
-            --purple:#a855f7;--purple3:rgba(168,85,247,.12);
-            --slate:#6b7280;--muted:#94a3b8;--light:#e2e8f0;--white:#f8fafc;
-            --mono:'DM Mono',monospace;--sans:'Syne',sans-serif;
-            --r:8px;--r2:12px;
-        }
-        html,body,#root{height:100%;background:var(--bg);color:var(--light);font-family:var(--mono);overflow:hidden}
-        .app{display:grid;grid-template-rows:52px 1fr;grid-template-columns:220px 1fr;height:100vh}
-        .topbar{grid-column:1/-1;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:14px;z-index:10}
-        .logo{font-family:var(--sans);font-size:16px;font-weight:800;color:var(--white);letter-spacing:-.02em}
-        .logo em{color:var(--red);font-style:normal}
-        .sidebar{background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column}
-        .main{overflow-y:auto;padding:20px;background:var(--bg)}
-        /* ... el resto de tus estilos se mantienen ... */
-        .badge{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:3px;font-size:8px;font-weight:600;border:1px solid}
-        .PENDING{color:var(--amber);border-color:rgba(245,158,11,.3);background:var(--amber3)}
-        .spinner{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--teal);border-radius:50%;animation:spin .6s linear infinite;display:inline-block}
-        @keyframes spin{to{transform:rotate(360deg)}}
-    </style>
+/* ── LAYOUT ─────────────────────────────── */
+.app{display:grid;grid-template-rows:52px 1fr;grid-template-columns:220px 1fr;height:100vh}
+.topbar{grid-column:1/-1;background:var(--bg2);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 20px;gap:14px;z-index:10}
+.logo{font-family:var(--sans);font-size:16px;font-weight:800;color:var(--white);letter-spacing:-.02em;white-space:nowrap}
+.logo em{color:var(--red);font-style:normal}
+.topbar-api{flex:1;display:flex;align-items:center;gap:8px;margin:0 16px}
+.api-input{flex:1;padding:5px 10px;font-size:10px;letter-spacing:.03em;max-width:380px}
+.api-badge{padding:3px 8px;border-radius:4px;font-size:8px;font-weight:600;letter-spacing:.1em;border:1px solid}
+.api-ok{color:var(--teal);border-color:rgba(20,184,166,.3);background:var(--teal3)}
+.api-err{color:var(--red);border-color:rgba(255,59,92,.3);background:var(--red3)}
+.api-testing{color:var(--amber);border-color:rgba(245,158,11,.3);background:var(--amber3)}
+.topbar-right{display:flex;gap:10px;align-items:center;font-size:9px;color:var(--slate)}
+.pulse{width:6px;height:6px;border-radius:50%;background:var(--teal);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ── SIDEBAR ─────────────────────────────── */
+.sidebar{background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.sidebar-entity{padding:10px 14px;border-bottom:1px solid var(--border);font-size:9px}
+.entity-label{color:var(--slate);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px}
+.entity-select{width:100%;padding:5px 8px;font-size:10px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;
+  font-size:11px;color:var(--muted);border-left:2px solid transparent;transition:all .15s}
+.nav-item:hover{color:var(--light);background:var(--bg3)}
+.nav-item.active{color:var(--white);background:var(--bg3);border-left-color:var(--red)}
+.nav-icon{font-size:14px;width:18px;text-align:center}
+.nav-badge{margin-left:auto;min-width:18px;height:16px;background:var(--red2);color:#fff;
+  border-radius:8px;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px}
+
+/* ── MAIN ─────────────────────────────────── */
+.main{overflow-y:auto;padding:20px;background:var(--bg)}
+.page-title{font-family:var(--sans);font-size:20px;font-weight:700;color:var(--white);margin-bottom:4px}
+.page-sub{font-size:10px;color:var(--slate);margin-bottom:20px}
+
+/* ── CARDS ────────────────────────────────── */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:16px 18px}
+.card-title{font-size:8px;color:var(--slate);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px}
+.card-val{font-family:var(--sans);font-size:28px;font-weight:800;color:var(--white);line-height:1}
+.card-sub{font-size:9px;color:var(--slate);margin-top:3px}
+.card-accent{height:2px;border-radius:2px;margin-bottom:10px}
+
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.grid-5{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+
+/* ── BADGES ─────────────────────────────── */
+.badge{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:3px;
+  font-size:8px;font-weight:600;letter-spacing:.07em;border:1px solid;white-space:nowrap}
+.CRITICAL,.BLOQUEADA,.FRAUD{color:var(--red);border-color:rgba(255,59,92,.35);background:var(--red3)}
+.HIGH,.REVISIÓN{color:var(--amber);border-color:rgba(245,158,11,.35);background:var(--amber3)}
+.MEDIUM,.ALERTA{color:var(--orange);border-color:rgba(249,115,22,.35);background:rgba(249,115,22,.1)}
+.LOW,.APROBADA,.CLEAN{color:var(--teal);border-color:rgba(20,184,166,.35);background:var(--teal3)}
+.CONFIRMED_FRAUD{color:var(--red);border-color:rgba(255,59,92,.45);background:rgba(255,59,92,.18)}
+.FALSE_POSITIVE{color:var(--teal);border-color:rgba(20,184,166,.45);background:rgba(20,184,166,.18)}
+.PENDING{color:var(--amber);border-color:rgba(245,158,11,.3);background:var(--amber3)}
+.UNDER_REVIEW{color:var(--blue);border-color:rgba(59,130,246,.3);background:var(--blue3)}
+.UNKNOWN{color:var(--slate);border-color:var(--border2);background:var(--bg3)}
+
+/* ── TABLE ──────────────────────────────── */
+.tbl{width:100%;border-collapse:collapse;font-size:10px}
+.tbl th{padding:7px 10px;text-align:left;color:var(--slate);border-bottom:1px solid var(--border);
+  font-size:8px;letter-spacing:.1em;font-weight:400;text-transform:uppercase}
+.tbl td{padding:7px 10px;border-bottom:1px solid rgba(255,255,255,.03)}
+.tbl tr:hover td{background:var(--bg3);cursor:pointer}
+.tbl .mono{font-size:9px;color:var(--slate)}
+
+/* ── SCORE BAR ──────────────────────────── */
+.sbar{height:6px;background:var(--bg4);border-radius:3px;overflow:hidden;position:relative}
+.sbar-fill{height:100%;border-radius:3px;transition:width .4s}
+.sbar-markers{position:relative;height:6px}
+
+/* ── FORM ───────────────────────────────── */
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.form-field{display:flex;flex-direction:column;gap:4px}
+.form-label{font-size:8px;color:var(--slate);letter-spacing:.1em;text-transform:uppercase}
+.form-input{padding:7px 10px;font-size:10px}
+.form-select{padding:7px 10px;font-size:10px}
+.btn{padding:8px 16px;border-radius:5px;border:none;font-size:10px;font-weight:600;
+  letter-spacing:.06em;transition:all .2s;cursor:pointer}
+.btn-red{background:var(--red2);color:#fff}.btn-red:hover{background:var(--red)}
+.btn-teal{background:rgba(20,184,166,.15);color:var(--teal);border:1px solid rgba(20,184,166,.3)}.btn-teal:hover{background:rgba(20,184,166,.25)}
+.btn-ghost{background:var(--bg3);color:var(--muted);border:1px solid var(--border2)}.btn-ghost:hover{color:var(--light)}
+.btn-amber{background:rgba(245,158,11,.15);color:var(--amber);border:1px solid rgba(245,158,11,.3)}.btn-amber:hover{background:rgba(245,158,11,.25)}
+.btn:disabled{opacity:.4;cursor:default}
+
+/* ── SECTION TITLE ──────────────────────── */
+.sec{font-size:8px;letter-spacing:.15em;color:var(--slate);text-transform:uppercase;
+  margin:16px 0 8px;display:flex;align-items:center;gap:8px}
+.sec::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* ── FEED ITEM ──────────────────────────── */
+.feed-item{display:flex;align-items:center;gap:10px;padding:8px 12px;
+  border-bottom:1px solid var(--border);transition:background .1s;cursor:default}
+.feed-item:hover{background:var(--bg3)}
+.feed-score{font-family:var(--sans);font-size:16px;font-weight:800;min-width:38px;text-align:right}
+.feed-meta{flex:1;min-width:0}
+.feed-txid{font-size:9px;color:var(--slate)}
+.feed-detail{font-size:10px;color:var(--light);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ── ALERT DETAIL ───────────────────────── */
+.split{display:grid;grid-template-columns:1fr 360px;gap:0;height:calc(100vh - 52px);overflow:hidden}
+.split-left{overflow-y:auto;padding:16px}
+.split-right{background:var(--bg2);border-left:1px solid var(--border);overflow-y:auto;display:flex;flex-direction:column}
+
+/* ── LOADING / EMPTY ────────────────────── */
+.center{display:flex;align-items:center;justify-content:center;height:200px;color:var(--slate);font-size:11px}
+.spinner{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--teal);
+  border-radius:50%;animation:spin .6s linear infinite;margin-right:8px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── TOAST ──────────────────────────────── */
+.toast{position:fixed;bottom:20px;right:20px;padding:10px 16px;border-radius:6px;font-size:10px;
+  border:1px solid;z-index:999;animation:slideup .25s ease;pointer-events:none}
+.toast-ok{background:var(--bg3);color:var(--teal);border-color:rgba(20,184,166,.4)}
+.toast-err{background:var(--bg3);color:var(--red);border-color:rgba(255,59,92,.4)}
+@keyframes slideup{from{transform:translateY(10px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+/* ── TREND ──────────────────────────────── */
+.trend-bar{display:flex;align-items:flex-end;gap:4px;height:60px}
+.trend-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px}
+.trend-bar-inner{width:100%;border-radius:2px 2px 0 0;min-height:2px;transition:height .4s}
+
+/* ── PROFILE STAT ───────────────────────── */
+.pstat{background:var(--bg3);border-radius:5px;padding:8px 10px}
+.pstat-val{font-family:var(--sans);font-size:18px;font-weight:800;line-height:1}
+.pstat-lbl{font-size:8px;color:var(--slate);margin-top:2px;letter-spacing:.06em}
+
+/* ── FEEDBACK ───────────────────────────── */
+.fb-btn{padding:9px 12px;border-radius:5px;border:1px solid;cursor:pointer;
+  font-size:10px;font-weight:600;letter-spacing:.05em;transition:all .2s;text-align:center}
+.fb-fraud{border-color:var(--red2);color:var(--red);background:var(--red3)}
+.fb-fraud.sel,.fb-fraud:hover{background:rgba(255,59,92,.25);border-color:var(--red)}
+.fb-fp{border-color:rgba(20,184,166,.3);color:var(--teal);background:var(--teal3)}
+.fb-fp.sel,.fb-fp:hover{background:rgba(20,184,166,.25);border-color:var(--teal)}
+.fb-review{border-color:rgba(59,130,246,.3);color:var(--blue);background:var(--blue3)}
+.fb-review.sel,.fb-review:hover{background:rgba(59,130,246,.25);border-color:var(--blue)}
+</style>
 </head>
 <body>
-    <div id="root"></div>
+<div id="root"></div>
+<script type="text/babel">
+const {useState, useEffect, useCallback, useRef} = React;
 
-    <script type="text/babel">
-        const { useState, useEffect, useCallback } = React;
+/* ══════════════════════════════════════════
+   API CLIENT
+══════════════════════════════════════════ */
+let API_BASE = localStorage.getItem('api_base') || 'http://localhost:8000';
+let AUTH_TOKEN = localStorage.getItem('auth_token') || null;
+// Ensure token is always read fresh on each api call
+function getToken() { return AUTH_TOKEN || localStorage.getItem('auth_token'); }
 
-        /* ══════════════════════════════════════════
-           CONFIGURACIÓN DE API SEGURA
-        ══════════════════════════════════════════ */
-        
-        // Prioridad: Railway > Localhost
-        let API_BASE = localStorage.getItem('api_base') || 'https://web-production-8ab58.up.railway.app';
-        let AUTH_TOKEN = localStorage.getItem('auth_token');
+async function api(path, opts={}) {
+  const token = getToken();
+  const headers = {'Content-Type':'application/json'};
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  if (opts.headers) Object.assign(headers, opts.headers);
+  const r = await fetch(API_BASE + path, {
+    ...opts,
+    headers,
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  if (!r.ok) {
+    const err = await r.json().catch(()=>({detail: r.statusText}));
+    throw new Error(err.detail || r.statusText);
+  }
+  return r.json();
+}
 
-        async function api(path, opts = {}) {
-            // Si no hay token, lo solicitamos una vez (útil para pruebas rápidas)
-            if (!AUTH_TOKEN) {
-                const promptToken = prompt("Introduce tu Bearer Token para continuar:");
-                if (promptToken) {
-                    localStorage.setItem('auth_token', promptToken);
-                    AUTH_TOKEN = promptToken;
-                }
-            }
+/* ══════════════════════════════════════════
+   HELPERS
+══════════════════════════════════════════ */
+function scoreColor(s) {
+  if (s >= 800) return 'var(--red)';
+  if (s >= 600) return 'var(--amber)';
+  if (s >= 400) return 'var(--orange)';
+  return 'var(--teal)';
+}
+function scoreGrad(s) {
+  if (s >= 800) return 'linear-gradient(90deg,#c42040,#ff3b5c)';
+  if (s >= 600) return 'linear-gradient(90deg,#d97706,#f59e0b)';
+  if (s >= 400) return 'linear-gradient(90deg,#ea580c,#f97316)';
+  return 'linear-gradient(90deg,#0d9488,#14b8a6)';
+}
+function fmtAmt(v) { return '$' + Number(v).toLocaleString('en',{minimumFractionDigits:2}); }
+function fmtDate(s) { return new Date(s).toLocaleString('es-EC',{dateStyle:'short',timeStyle:'short'}); }
+function riskClass(r) { return r || 'UNKNOWN'; }
+function decisClass(d) { return d?.replace('Ó','O').replace('É','E').replace('Á','A') || ''; }
 
-            const headers = { 'Content-Type': 'application/json' };
-            if (AUTH_TOKEN) headers['Authorization'] = `Bearer ${AUTH_TOKEN}`;
-            
-            try {
-                const r = await fetch(API_BASE + path, {
-                    ...opts,
-                    headers,
-                    body: opts.body ? JSON.stringify(opts.body) : undefined,
-                });
+function Spinner() { return <span className="spinner"/>; }
+function Loading() { return <div className="center"><Spinner/>Cargando...</div>; }
 
-                if (r.status === 401) {
-                    console.error("Error de autenticación. Token inválido.");
-                    localStorage.removeItem('auth_token'); // Limpiar token corrupto
-                }
+function ScoreBar({score, max=999}) {
+  const pct = (score/max)*100;
+  return (
+    <div>
+      <div style={{display:'flex',justifyContent:'space-between',fontSize:8,color:'var(--slate)',marginBottom:3}}>
+        <span>0</span><span style={{color:'var(--orange)'}}>400</span>
+        <span style={{color:'var(--amber)'}}>600</span><span style={{color:'var(--red)'}}>800</span>
+        <span>999</span>
+      </div>
+      <div className="sbar">
+        {[400,600,800].map(t=>(
+          <div key={t} style={{position:'absolute',left:`${(t/999)*100}%`,top:0,bottom:0,
+            width:1,background:'rgba(255,255,255,.1)',zIndex:1}}/>
+        ))}
+        <div className="sbar-fill" style={{width:`${pct}%`,background:scoreGrad(score)}}/>
+      </div>
+    </div>
+  );
+}
 
-                if (!r.ok) {
-                    const err = await r.json().catch(() => ({ detail: r.statusText }));
-                    throw new Error(err.detail || r.statusText);
-                }
-                return r.json();
-            } catch (error) {
-                console.error("API Error:", error.message);
-                throw error;
-            }
-        }
+function Toast({msg, type}) {
+  return msg ? <div className={`toast toast-${type}`}>{msg}</div> : null;
+}
 
-        /* ══════════════════════════════════════════
-           COMPONENTE PRINCIPAL (APP)
-        ══════════════════════════════════════════ */
+/* ══════════════════════════════════════════
+   PAGE: DASHBOARD
+══════════════════════════════════════════ */
+function Dashboard({entity, toast}) {
+  const [stats, setStats]   = useState(null);
+  const [feed,  setFeed]    = useState([]);
+  const [loading, setLoad]  = useState(true);
 
-        function App() {
-            const [view, setView] = useState('dashboard');
-            const [entity, setEntity] = useState('DEMO');
-            const [toast, setToast] = useState({ msg: '', type: '' });
+  const load = useCallback(async () => {
+    try {
+      const [s, f] = await Promise.all([
+        api(`/api/v2/stats${entity ? `?entity_code=${entity}` : ''}`),
+        api(`/api/v2/feed?limit=30${entity ? `&entity_code=${entity}` : ''}`),
+      ]);
+      setStats(s); setFeed(f.data); setLoad(false);
+    } catch(e) { setLoad(false); }
+  }, [entity]);
 
-            const showToast = (msg, type = 'ok') => {
-                setToast({ msg, type });
-                setTimeout(() => setToast({ msg: '', type: '' }), 4000);
-            };
+  useEffect(() => { load(); const t = setInterval(load, 5000); return ()=>clearInterval(t); }, [load]);
 
-            return (
-                <div className="app">
-                    <header className="topbar">
-                        <div className="logo">FRAUD<em>INTEL</em></div>
-                        <div style={{fontSize: '10px', color: 'var(--slate)'}}> | Platform V2.0</div>
-                        <div style={{marginLeft: 'auto', display: 'flex', gap: '15px', alignItems: 'center'}}>
-                            <div className="badge PENDING" style={{cursor: 'pointer'}} onClick={() => {
-                                const newBase = prompt("Cambiar API Base:", API_BASE);
-                                if(newBase) { localStorage.setItem('api_base', newBase); window.location.reload(); }
-                            }}>API: {API_BASE.includes('railway') ? 'PROD' : 'LOCAL'}</div>
-                        </div>
-                    </header>
+  if (loading) return <Loading/>;
+  if (!stats) return <div className="center">No se pudo conectar al backend. Verifica la URL de la API.</div>;
 
-                    <aside className="sidebar">
-                        <div style={{padding: '20px'}}>
-                            <nav>
-                                <div className={`nav-item ${view === 'dashboard' ? 'active' : ''}`} onClick={() => setView('dashboard')}>Dashboard</div>
-                                <div className={`nav-item ${view === 'alerts' ? 'active' : ''}`} onClick={() => setView('alerts')}>Alertas</div>
-                            </nav>
-                        </div>
-                    </aside>
+  const T = stats.totals;
+  const maxTrend = Math.max(...(stats.trend_7d||[]).map(d=>d.total), 1);
 
-                    <main className="main">
-                        {view === 'dashboard' ? <Dashboard entity={entity} /> : <AlertsView entity={entity} showToast={showToast} />}
-                    </main>
+  return (
+    <div>
+      <div className="page-title">Dashboard</div>
+      <div className="page-sub">Actualización automática cada 5 segundos</div>
 
-                    {toast.msg && <div className={`toast ${toast.type}`} style={{position: 'fixed', bottom: 20, right: 20, background: 'var(--bg3)', padding: '10px', border: '1px solid var(--border2)'}}>{toast.msg}</div>}
+      {/* KPIs */}
+      <div className="grid-5" style={{marginBottom:16}}>
+        {[
+          ['Total TX', T.transactions, 'var(--teal)', T.transactions],
+          ['Aprobadas', T.approved, 'var(--teal)', T.approved],
+          ['Alertas', T.alerted, 'var(--orange)', T.alerted],
+          ['En Revisión', T.review, 'var(--amber)', T.review],
+          ['Bloqueadas', T.blocked, 'var(--red)', T.blocked],
+        ].map(([l,v,c])=>(
+          <div className="card" key={l}>
+            <div className="card-accent" style={{background:c}}/>
+            <div className="card-title">{l}</div>
+            <div className="card-val" style={{color:c}}>{v.toLocaleString()}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid-3" style={{marginBottom:16}}>
+        {/* Tasas */}
+        <div className="card">
+          <div className="card-title">Tasas del sistema</div>
+          {[
+            ['Aprobación', stats.rates.approval, 'var(--teal)'],
+            ['Revisión',   stats.rates.review,   'var(--amber)'],
+            ['Bloqueo',    stats.rates.block,     'var(--red)'],
+          ].map(([l,v,c])=>(
+            <div key={l} style={{marginBottom:8}}>
+              <div style={{display:'flex',justifyContent:'space-between',fontSize:9,marginBottom:3}}>
+                <span style={{color:'var(--slate)'}}>{l}</span>
+                <span style={{color:c,fontWeight:600}}>{v}%</span>
+              </div>
+              <div style={{height:4,background:'var(--bg4)',borderRadius:2,overflow:'hidden'}}>
+                <div style={{width:`${v}%`,height:'100%',background:c,borderRadius:2}}/>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Alertas */}
+        <div className="card">
+          <div className="card-title">Alertas por estado</div>
+          {[
+            ['Pendientes',       stats.alerts.pending,          'var(--amber)'],
+            ['Fraude confirmado',stats.alerts.confirmed_fraud,  'var(--red)'],
+            ['Falso positivo',   stats.alerts.false_positives,  'var(--teal)'],
+          ].map(([l,v,c])=>(
+            <div key={l} style={{display:'flex',justifyContent:'space-between',padding:'5px 0',borderBottom:'1px solid rgba(255,255,255,.04)',fontSize:10}}>
+              <span style={{color:'var(--muted)'}}>{l}</span>
+              <span style={{color:c,fontFamily:'var(--sans)',fontWeight:700}}>{v}</span>
+            </div>
+          ))}
+          <div style={{marginTop:8,fontSize:9,color:'var(--slate)'}}>
+            Perfiles: <span style={{color:'var(--light)'}}>{stats.profiles.total}</span> total ·{' '}
+            <span style={{color:'var(--red)'}}>{stats.profiles.fraud}</span> fraude ·{' '}
+            <span style={{color:'var(--teal)'}}>{stats.profiles.clean}</span> limpios
+          </div>
+        </div>
+
+        {/* Tendencia 7d */}
+        <div className="card">
+          <div className="card-title">Tendencia 7 días</div>
+          <div className="trend-bar" style={{marginTop:8}}>
+            {(stats.trend_7d||[]).map((d,i)=>(
+              <div className="trend-col" key={i}>
+                <div className="trend-bar-inner"
+                  style={{height:`${Math.max((d.total/maxTrend)*48,2)}px`,
+                    background:d.blocked>0?'var(--red)':'var(--teal)',opacity:.8}}
+                  title={`${d.date}: ${d.total} TX, ${d.blocked} bloqueadas`}
+                />
+                <span style={{fontSize:7,color:'var(--slate)'}}>{d.date}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{marginTop:6,display:'flex',gap:10,fontSize:8,color:'var(--slate)'}}>
+            <span style={{display:'flex',alignItems:'center',gap:3}}><span style={{width:8,height:8,background:'var(--teal)',borderRadius:2,display:'inline-block'}}/>Normal</span>
+            <span style={{display:'flex',alignItems:'center',gap:3}}><span style={{width:8,height:8,background:'var(--red)',borderRadius:2,display:'inline-block'}}/>Con bloqueos</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Por canal */}
+      <div className="card" style={{marginBottom:16}}>
+        <div className="card-title">Distribución por canal</div>
+        <div className="grid-4" style={{marginTop:8}}>
+          {[['CARD','💳'],['TRANSFER','🏦'],['WALLET','📱'],['ATM','🏧']].map(([ch,ic])=>(
+            <div key={ch} style={{background:'var(--bg3)',borderRadius:6,padding:'10px 12px',textAlign:'center'}}>
+              <div style={{fontSize:20,marginBottom:4}}>{ic}</div>
+              <div style={{fontFamily:'var(--sans)',fontSize:20,fontWeight:800,color:'var(--white)'}}>{(stats.by_channel[ch]||0).toLocaleString()}</div>
+              <div style={{fontSize:9,color:'var(--slate)',marginTop:2}}>{ch}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Feed en tiempo real */}
+      <div className="card">
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+          <div className="card-title" style={{margin:0}}>Feed en tiempo real</div>
+          <div style={{display:'flex',alignItems:'center',gap:6,fontSize:9,color:'var(--teal)'}}>
+            <div className="pulse"/>{fmtDate(new Date().toISOString())}
+          </div>
+        </div>
+        <div style={{maxHeight:300,overflowY:'auto'}}>
+          {feed.length === 0 && <div className="center" style={{height:80}}>Sin transacciones. Usa POST /api/v2/simulate para generar datos.</div>}
+          {feed.map(tx=>(
+            <div className="feed-item" key={tx.tx_id}>
+              <div className="feed-score" style={{color:scoreColor(tx.scoring.score_final)}}>
+                {tx.scoring.score_final}
+              </div>
+              <div style={{width:4,height:28,borderRadius:2,background:scoreColor(tx.scoring.score_final),flexShrink:0}}/>
+              <div className="feed-meta">
+                <div className="feed-txid">{tx.tx_id}</div>
+                <div className="feed-detail">{tx.cardholder} · {tx.channel} · {fmtAmt(tx.amount)} · {tx.city}</div>
+              </div>
+              <span className={`badge ${tx.scoring.decision}`}>{tx.scoring.decision}</span>
+              <span style={{fontSize:9,color:'var(--slate)',marginLeft:4}}>{fmtDate(tx.created_at)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   PAGE: ALERTAS
+══════════════════════════════════════════ */
+function Alerts({entity, showToast}) {
+  const [alerts,   setAlerts]   = useState([]);
+  const [selected, setSel]      = useState(null);
+  const [detail,   setDetail]   = useState(null);
+  const [filter,   setFilter]   = useState('PENDING');
+  const [loading,  setLoad]     = useState(true);
+  const [detLoad,  setDLoad]    = useState(false);
+  const [label,    setLabel]    = useState(null);
+  const [note,     setNote]     = useState('');
+  const [submitting, setSubmit] = useState(false);
+
+  const loadAlerts = useCallback(async () => {
+    try {
+      const d = await api(`/api/v2/alerts?status=${filter}&limit=100${entity?`&entity_code=${entity}`:''}`);
+      setAlerts(d.data); setLoad(false);
+    } catch(e) { setLoad(false); }
+  }, [filter, entity]);
+
+  useEffect(() => { setLoad(true); loadAlerts(); }, [loadAlerts]);
+
+  const selectAlert = async (a) => {
+    setSel(a.id); setDetail(null); setLabel(null); setNote(''); setDLoad(true);
+    try {
+      const d = await api(`/api/v2/alerts/${a.id}`);
+      setDetail(d); setDLoad(false);
+    } catch(e) { setDLoad(false); showToast('Error cargando detalle','err'); }
+  };
+
+  const submitFeedback = async () => {
+    if (!label || !selected) return;
+    setSubmit(true);
+    try {
+      const r = await api(`/api/v2/alerts/${selected}/feedback`, {
+        method:'POST',
+        body:{analyst_label:label, analyst_note:note, analyst_id:'analyst_001', trigger_retrain:true}
+      });
+      showToast(r.retrain_triggered ? '✅ Calificado — modelo re-entrenando...' : '✅ Calificación guardada', 'ok');
+      loadAlerts();
+      setDetail(d => d ? {...d, alert:{...d.alert, feedback:{...d.alert.feedback, status:label, analyst_label:label}}} : d);
+    } catch(e) { showToast('Error: ' + e.message,'err'); }
+    setSubmit(false);
+  };
+
+  const filters = [['PENDING','Pendientes'],['CONFIRMED_FRAUD','Fraude'],['FALSE_POSITIVE','Falso +'],['UNDER_REVIEW','Revisión'],['ALL','Todas']];
+  const current = alerts.find(a=>a.id===selected);
+
+  return (
+    <div className="split" style={{marginTop:-20,marginLeft:-20,marginRight:-20}}>
+      {/* LEFT: Lista */}
+      <div style={{display:'flex',flexDirection:'column',overflow:'hidden',borderRight:'1px solid var(--border)'}}>
+        <div style={{padding:'12px 14px',borderBottom:'1px solid var(--border)',background:'var(--bg2)',flexShrink:0}}>
+          <div style={{fontFamily:'var(--sans)',fontSize:14,fontWeight:700,color:'var(--white)',marginBottom:8}}>Visor de Alertas</div>
+          <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+            {filters.map(([f,l])=>(
+              <button key={f} onClick={()=>setFilter(f)}
+                style={{padding:'3px 8px',borderRadius:4,border:'1px solid',fontSize:8,fontFamily:'var(--mono)',cursor:'pointer',
+                  background:filter===f?'var(--red3)':'var(--bg3)',
+                  borderColor:filter===f?'rgba(255,59,92,.4)':'var(--border2)',
+                  color:filter===f?'var(--red)':'var(--muted)'}}>
+                {l}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div style={{overflowY:'auto',flex:1}}>
+          {loading && <Loading/>}
+          {!loading && alerts.length===0 && <div className="center" style={{flexDirection:'column',gap:6}}>
+            <div style={{fontSize:20,opacity:.3}}>🔔</div>
+            <div>No hay alertas con estado "{filter}"</div>
+          </div>}
+          {alerts.map(a=>(
+            <div key={a.id}
+              onClick={()=>selectAlert(a)}
+              style={{padding:'10px 14px',borderBottom:'1px solid var(--border)',cursor:'pointer',
+                background:selected===a.id?'var(--bg3)':'transparent',
+                borderLeft:'2px solid '+(selected===a.id?scoreColor(a.score_final):'transparent')}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
+                <span style={{fontFamily:'var(--sans)',fontSize:18,fontWeight:800,color:scoreColor(a.score_final)}}>{a.score_final}</span>
+                <span className={`badge ${a.feedback.status}`} style={{fontSize:7}}>
+                  {a.feedback.status==='PENDING'?'PENDIENTE':a.feedback.status==='CONFIRMED_FRAUD'?'FRAUDE':a.feedback.status==='FALSE_POSITIVE'?'FALSO +':'REVISIÓN'}
+                </span>
+              </div>
+              <div style={{fontSize:9,color:'var(--slate)',marginBottom:3,fontFamily:'var(--mono)'}}>{a.tx_id}</div>
+              <div style={{display:'flex',justifyContent:'space-between',fontSize:10}}>
+                <span style={{color:'var(--white)'}}>{fmtAmt(a.amount)}</span>
+                <span className={`badge ${a.risk_level}`} style={{fontSize:7}}>{a.channel}</span>
+              </div>
+              <div style={{fontSize:9,color:'var(--slate)',marginTop:2}}>{a.cardholder} · {a.city}</div>
+              <div style={{fontSize:8,color:'var(--border2)',marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{a.top_rule}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* MIDDLE: Detalle */}
+      <div className="split-left">
+        {!selected && <div className="center" style={{flexDirection:'column',gap:8,height:'100%'}}>
+          <div style={{fontSize:32,opacity:.2}}>🛡</div>
+          <div>Selecciona una alerta para revisar</div>
+        </div>}
+        {selected && detLoad && <Loading/>}
+        {selected && !detLoad && detail && (() => {
+          const {alert:al, transaction:tx, profile:p, identity_history:hist, previous_alerts:prevA} = detail;
+          if (!tx) return <div className="center">Error cargando transacción</div>;
+          return (
+            <>
+              {/* Header */}
+              <div style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:'12px',padding:'14px 16px',marginBottom:12}}>
+                <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
+                  <div style={{fontFamily:'var(--sans)',fontSize:18,fontWeight:800,color:'var(--white)'}}>{tx.tx_id}</div>
+                  <div style={{fontFamily:'var(--sans)',fontSize:26,fontWeight:800,color:scoreColor(al.score_final)}}>{al.score_final}</div>
+                  <span className={`badge ${al.decision}`}>{al.decision}</span>
+                  <span className={`badge ${al.risk_level}`}>{al.risk_level}</span>
+                  <span style={{marginLeft:'auto',fontSize:9,color:'var(--slate)'}}>{fmtDate(al.created_at)}</span>
                 </div>
-            );
-        }
-
-        /* ══════════════════════════════════════════
-           DASHBOARD (Simplificado para el ejemplo)
-        ══════════════════════════════════════════ */
-
-        function Dashboard({ entity }) {
-            const [data, setData] = useState(null);
-            const [error, setError] = useState(null);
-
-            useEffect(() => {
-                api(`/api/v2/stats?entity_code=${entity}`)
-                    .then(setData)
-                    .catch(err => setError(err.message));
-            }, [entity]);
-
-            if (error) return <div style={{color: 'var(--red)'}}>Error de conexión: {error}</div>;
-            if (!data) return <div>Cargando estadísticas...</div>;
-
-            return (
-                <div>
-                    <h1 style={{fontFamily: 'var(--sans)', marginBottom: '20px'}}>Dashboard General</h1>
-                    <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '15px'}}>
-                        <div style={{background: 'var(--bg2)', padding: '20px', borderRadius: '8px', border: '1px solid var(--border)'}}>
-                            <div style={{fontSize: '10px', color: 'var(--slate)'}}>TRANSACCIONES</div>
-                            <div style={{fontSize: '24px', fontWeight: '800'}}>{data.totals.transactions}</div>
-                        </div>
-                        <div style={{background: 'var(--bg2)', padding: '20px', borderRadius: '8px', border: '1px solid var(--border)'}}>
-                            <div style={{fontSize: '10px', color: 'var(--slate)'}}>ALERTAS</div>
-                            <div style={{fontSize: '24px', fontWeight: '800', color: 'var(--orange)'}}>{data.totals.alerted}</div>
-                        </div>
-                        <div style={{background: 'var(--bg2)', padding: '20px', borderRadius: '8px', border: '1px solid var(--border)'}}>
-                            <div style={{fontSize: '10px', color: 'var(--slate)'}}>BLOQUEOS</div>
-                            <div style={{fontSize: '24px', fontWeight: '800', color: 'var(--red)'}}>{data.totals.blocked}</div>
-                        </div>
+                <ScoreBar score={al.score_final}/>
+                <div className="grid-4" style={{marginTop:10}}>
+                  {[['Canal',`${tx.channel} ${tx.subtype||''}`],['Monto',fmtAmt(tx.amount)],['Titular',tx.cardholder||'—'],['Ciudad',tx.city||'—']].map(([l,v])=>(
+                    <div key={l} style={{background:'var(--bg3)',borderRadius:5,padding:'7px 9px'}}>
+                      <div style={{fontSize:8,color:'var(--slate)',marginBottom:2}}>{l}</div>
+                      <div style={{fontSize:11,color:'var(--white)',fontWeight:500}}>{v}</div>
                     </div>
+                  ))}
                 </div>
-            );
-        }
+              </div>
 
-        /* ══════════════════════════════════════════
-           ALERTS VIEW (Base para tu visor de alertas)
-        ══════════════════════════════════════════ */
+              {/* Score breakdown */}
+              <div className="sec">Desglose de score</div>
+              <div className="grid-3" style={{marginBottom:12}}>
+                {[['Score Reglas',tx.scoring.score_rules,'Heurísticas (40%)'],
+                  ['Score ML',tx.scoring.score_ml,'Modelo GBT (60%)'],
+                  ['Score Final',tx.scoring.score_final,'Combinado']].map(([l,s,sub])=>(
+                  <div key={l} style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:'var(--r)',padding:'10px 12px'}}>
+                    <div style={{fontSize:8,color:'var(--slate)',marginBottom:4}}>{l}</div>
+                    <div style={{fontFamily:'var(--sans)',fontSize:22,fontWeight:800,color:scoreColor(s)}}>{s}</div>
+                    <div style={{fontSize:8,color:'var(--border2)',marginBottom:5}}>{sub}</div>
+                    <div style={{height:3,background:'var(--bg4)',borderRadius:2,overflow:'hidden'}}>
+                      <div style={{width:`${(s/999)*100}%`,height:'100%',background:scoreGrad(s)}}/>
+                    </div>
+                  </div>
+                ))}
+              </div>
 
-        function AlertsView({ entity, showToast }) {
-            return (
+              {/* Reglas */}
+              {tx.rules_triggered?.length>0 && <>
+                <div className="sec">Reglas disparadas ({tx.rules_triggered.length})</div>
+                {tx.rules_triggered.map(r=>(
+                  <div key={r.rule_id} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 10px',
+                    background:'var(--bg2)',border:'1px solid var(--border)',borderLeft:'2px solid '+scoreColor(r.points),
+                    borderRadius:5,marginBottom:5}}>
+                    <span style={{fontSize:8,color:'var(--slate)',minWidth:36}}>{r.rule_id}</span>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:10,color:'var(--white)'}}>{r.name}</div>
+                      <div style={{fontSize:8,color:'var(--slate)'}}>{r.description}</div>
+                    </div>
+                    <span style={{fontFamily:'var(--sans)',fontSize:14,fontWeight:700,color:scoreColor(r.points)}}>+{r.points}</span>
+                  </div>
+                ))}
+              </>}
+
+              {/* AML */}
+              {tx.aml_flags?.length>0 && <>
+                <div className="sec" style={{color:'var(--purple)'}}>Flags AML ({tx.aml_flags.length})</div>
+                {tx.aml_flags.map(r=>(
+                  <div key={r.rule_id} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 10px',
+                    background:'var(--bg2)',border:'1px solid rgba(168,85,247,.25)',borderLeft:'2px solid var(--purple)',
+                    borderRadius:5,marginBottom:5}}>
+                    <span style={{fontSize:8,color:'var(--purple)',minWidth:36}}>{r.rule_id}</span>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:10,color:'var(--white)'}}>{r.name}</div>
+                      <div style={{fontSize:8,color:'var(--slate)'}}>{r.description}</div>
+                    </div>
+                    <span style={{fontFamily:'var(--sans)',fontSize:14,fontWeight:700,color:'var(--purple)'}}>+{r.points}</span>
+                  </div>
+                ))}
+              </>}
+
+              {/* Historial identidad */}
+              {hist?.length>0 && <>
+                <div className="sec">Historial de la identidad ({hist.length} TX)</div>
+                <table className="tbl" style={{marginBottom:12}}>
+                  <thead><tr><th>TX ID</th><th>Canal</th><th>Monto</th><th>Score</th><th>Decisión</th><th>Ciudad</th><th>Fecha</th></tr></thead>
+                  <tbody>
+                    {hist.map(h=>(
+                      <tr key={h.tx_id}>
+                        <td className="mono">{h.tx_id}</td>
+                        <td><span className={`badge ${h.scoring.risk_level}`}>{h.channel}</span></td>
+                        <td>{fmtAmt(h.amount)}</td>
+                        <td style={{fontFamily:'var(--sans)',fontWeight:700,color:scoreColor(h.scoring.score_final)}}>{h.scoring.score_final}</td>
+                        <td><span className={`badge ${h.scoring.decision}`}>{h.scoring.decision}</span></td>
+                        <td style={{color:'var(--slate)'}}>{h.city}</td>
+                        <td className="mono">{fmtDate(h.created_at)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </>}
+            </>
+          );
+        })()}
+      </div>
+
+      {/* RIGHT: Perfil + Feedback */}
+      {selected && detail && (() => {
+        const {alert:al, profile:p} = detail;
+        const alreadyLabeled = al?.feedback?.status && !['PENDING','UNDER_REVIEW'].includes(al.feedback.status);
+        return (
+          <div className="split-right">
+            {/* Perfil */}
+            {p ? (
+              <>
+                <div style={{padding:'12px 14px',borderBottom:'1px solid var(--border)',background:'var(--bg3)'}}>
+                  <div style={{fontFamily:'var(--sans)',fontSize:13,fontWeight:700,color:'var(--white)',marginBottom:1}}>👤 Perfil Transaccional</div>
+                  <div style={{fontSize:9,color:'var(--slate)'}}>{p.identity_type} · {p.identity_value}</div>
+                  <div style={{marginTop:5,display:'flex',gap:5,flexWrap:'wrap'}}>
+                    <span className={`badge ${p.risk.risk_label}`}>{p.risk.risk_label}</span>
+                    {p.risk.fraud_confirmed>0 && <span className="badge CRITICAL">⚠ {p.risk.fraud_confirmed} fraudes</span>}
+                    {p.risk.false_positives>0 && <span className="badge CLEAN">✓ {p.risk.false_positives} FP</span>}
+                  </div>
+                </div>
+
+                <div style={{padding:'10px 14px',borderBottom:'1px solid var(--border)'}}>
+                  <div className="sec" style={{marginTop:0}}>Velocidad</div>
+                  <div className="grid-2">
+                    {[['TX / 1h',p.velocity.tx_1h,3],['TX / 24h',p.velocity.tx_24h,8],['TX / 7d',p.velocity.tx_7d,20],['TX / 30d',p.velocity.tx_30d,60]].map(([l,v,hi])=>(
+                      <div className="pstat" key={l}>
+                        <div className="pstat-val" style={{color:v>=hi?'var(--red)':v>=hi/2?'var(--amber)':'var(--white)'}}>{v}</div>
+                        <div className="pstat-lbl">{l}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{padding:'10px 14px',borderBottom:'1px solid var(--border)'}}>
+                  <div className="sec" style={{marginTop:0}}>Montos</div>
+                  <div className="grid-2">
+                    <div className="pstat">
+                      <div className="pstat-val">{fmtAmt(p.amounts.avg_30d)}</div>
+                      <div className="pstat-lbl">Promedio 30d</div>
+                    </div>
+                    <div className="pstat">
+                      <div className="pstat-val" style={{color:'var(--amber)'}}>{fmtAmt(p.amounts.max_30d)}</div>
+                      <div className="pstat-lbl">Máximo 30d</div>
+                    </div>
+                    <div className="pstat" style={{gridColumn:'1/-1'}}>
+                      <div className="pstat-val">{fmtAmt(p.amounts.sum_24h)}</div>
+                      <div className="pstat-lbl">Volumen 24h</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{padding:'10px 14px',borderBottom:'1px solid var(--border)'}}>
+                  <div className="sec" style={{marginTop:0}}>Geografía</div>
+                  <div style={{display:'flex',flexWrap:'wrap',gap:3,marginBottom:5}}>
+                    {(p.geo.cities_seen||[]).map(c=><span key={c} style={{background:'var(--bg4)',border:'1px solid var(--border)',borderRadius:3,padding:'1px 5px',fontSize:8,color:'var(--slate)'}}>{c}</span>)}
+                  </div>
+                  {p.geo.cities_24h>1 && <div style={{fontSize:9,color:'var(--red)'}}>⚠ {p.geo.cities_24h} ciudades en 24h</div>}
+                </div>
+
+                <div style={{padding:'10px 14px',borderBottom:'1px solid var(--border)'}}>
+                  <div className="sec" style={{marginTop:0}}>Score histórico</div>
+                  <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:8,color:'var(--slate)',marginBottom:3}}>Promedio 30d</div>
+                      <div style={{height:4,background:'var(--bg4)',borderRadius:2,overflow:'hidden'}}>
+                        <div style={{width:`${(p.risk.score_avg_30d/999)*100}%`,height:'100%',background:scoreGrad(p.risk.score_avg_30d)}}/>
+                      </div>
+                    </div>
+                    <span style={{fontFamily:'var(--sans)',fontWeight:700,fontSize:13,color:scoreColor(p.risk.score_avg_30d)}}>{Math.round(p.risk.score_avg_30d)}</span>
+                  </div>
+                  <div style={{display:'flex',alignItems:'center',gap:8}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:8,color:'var(--slate)',marginBottom:3}}>Máximo histórico</div>
+                      <div style={{height:4,background:'var(--bg4)',borderRadius:2,overflow:'hidden'}}>
+                        <div style={{width:`${(p.risk.score_max_ever/999)*100}%`,height:'100%',background:scoreGrad(p.risk.score_max_ever)}}/>
+                      </div>
+                    </div>
+                    <span style={{fontFamily:'var(--sans)',fontWeight:700,fontSize:13,color:scoreColor(p.risk.score_max_ever)}}>{p.risk.score_max_ever}</span>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="center" style={{padding:14,fontSize:10,color:'var(--slate)'}}>Perfil no disponible para esta alerta</div>
+            )}
+
+            {/* FEEDBACK */}
+            <div style={{padding:'12px 14px',marginTop:'auto',borderTop:'1px solid var(--border)',background:'var(--bg3)'}}>
+              <div style={{fontSize:9,color:'var(--slate)',letterSpacing:'.1em',textTransform:'uppercase',marginBottom:8}}>Calificar alerta</div>
+
+              {alreadyLabeled ? (
                 <div>
-                    <h1 style={{fontFamily: 'var(--sans)'}}>Gestión de Alertas</h1>
-                    <p style={{fontSize: '11px', color: 'var(--slate)'}}>Entidad: {entity}</p>
-                    <div style={{marginTop: '20px', opacity: 0.5}}>Conectado a la API de producción en Railway.</div>
+                  <span className={`badge ${al.feedback.analyst_label}`} style={{display:'block',textAlign:'center',padding:8,fontSize:10}}>
+                    {al.feedback.analyst_label==='CONFIRMED_FRAUD'?'🚨 FRAUDE CONFIRMADO':al.feedback.analyst_label==='FALSE_POSITIVE'?'✅ FALSO POSITIVO':'🔍 EN REVISIÓN'}
+                  </span>
+                  {al.feedback.analyst_note && <div style={{marginTop:6,fontSize:9,color:'var(--slate)',fontStyle:'italic'}}>"{al.feedback.analyst_note}"</div>}
+                  {al.feedback.used_for_training && <div style={{marginTop:6,background:'rgba(20,184,166,.08)',border:'1px solid rgba(20,184,166,.2)',borderRadius:4,padding:'5px 8px',fontSize:8,color:'var(--teal)',textAlign:'center'}}>🤖 Usado para re-entrenar el modelo</div>}
                 </div>
-            );
-        }
+              ) : (
+                <>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:8}}>
+                    <div className={`fb-btn fb-fraud ${label==='CONFIRMED_FRAUD'?'sel':''}`} onClick={()=>setLabel('CONFIRMED_FRAUD')}>🚨 Fraude</div>
+                    <div className={`fb-btn fb-fp ${label==='FALSE_POSITIVE'?'sel':''}`} onClick={()=>setLabel('FALSE_POSITIVE')}>✅ Falso +</div>
+                    <div className={`fb-btn fb-review ${label==='UNDER_REVIEW'?'sel':''}`} style={{gridColumn:'1/-1'}} onClick={()=>setLabel('UNDER_REVIEW')}>🔍 En revisión</div>
+                  </div>
+                  <textarea rows={2} placeholder="Notas del analista..."
+                    value={note} onChange={e=>setNote(e.target.value)}
+                    style={{width:'100%',padding:'6px 8px',fontSize:9,resize:'none',marginBottom:6,background:'var(--bg4)',border:'1px solid var(--border2)',color:'var(--light)',borderRadius:4,outline:'none'}}/>
+                  <button className="btn btn-red" style={{width:'100%'}} disabled={!label||submitting} onClick={submitFeedback}>
+                    {submitting?<><Spinner/>Guardando...</>:'Guardar + Re-entrenar →'}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
+/* ══════════════════════════════════════════
+   PAGE: PERFILES
+══════════════════════════════════════════ */
+function Profiles({entity, showToast}) {
+  const [profiles, setProfiles] = useState([]);
+  const [total, setTotal]       = useState(0);
+  const [loading, setLoad]      = useState(true);
+  const [search, setSearch]     = useState('');
+  const [searching, setSearching] = useState(false);
+  const [searchResult, setSearchResult] = useState(null);
+  const [riskFilter, setRisk]   = useState('');
+
+  const load = useCallback(async () => {
+    try {
+      const d = await api(`/api/v2/profiles?limit=50${entity?`&entity_code=${entity}`:''}${riskFilter?`&risk_label=${riskFilter}`:''}`);
+      setProfiles(d.profiles); setTotal(d.total); setLoad(false);
+    } catch(e) { setLoad(false); }
+  }, [entity, riskFilter]);
+
+  useEffect(() => { setLoad(true); load(); }, [load]);
+
+  const doSearch = async () => {
+    if (!search.trim() || !entity) return;
+    setSearching(true); setSearchResult(null);
+    try {
+      const d = await api(`/api/v2/profiles/search?entity_code=${entity}&identity_value=${encodeURIComponent(search)}`);
+      setSearchResult(d);
+    } catch(e) {
+      showToast(e.message==='Perfil no encontrado — aún no tiene transacciones'
+        ? 'Perfil no encontrado para esa identidad' : e.message, 'err');
+    }
+    setSearching(false);
+  };
+
+  return (
+    <div>
+      <div className="page-title">Perfiles Transaccionales</div>
+      <div className="page-sub">Historial acumulativo por identidad — tarjeta, cuenta, usuario o dispositivo</div>
+
+      {/* Search */}
+      <div className="card" style={{marginBottom:14}}>
+        <div style={{display:'flex',gap:8,alignItems:'center'}}>
+          <input className="form-input" style={{flex:1,padding:'7px 10px',fontSize:10}}
+            placeholder="Buscar identidad exacta (ej: ACC1001, 4532015112830366)..."
+            value={search} onChange={e=>setSearch(e.target.value)}
+            onKeyDown={e=>e.key==='Enter'&&doSearch()}/>
+          <button className="btn btn-teal" disabled={!search.trim()||!entity||searching} onClick={doSearch}>
+            {searching?<><Spinner/>Buscando...</>:'Buscar →'}
+          </button>
+          {searchResult && <button className="btn btn-ghost" onClick={()=>{setSearchResult(null);setSearch('')}}>✕ Limpiar</button>}
+        </div>
+        {!entity && <div style={{fontSize:9,color:'var(--amber)',marginTop:6}}>⚠ Selecciona una entidad para buscar perfiles</div>}
+      </div>
+
+      {/* Search result */}
+      {searchResult && (() => {
+        const {profile:p, transactions:txs, alerts} = searchResult;
+        return (
+          <div className="card" style={{marginBottom:14,border:'1px solid rgba(20,184,166,.3)'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:10}}>
+              <div>
+                <div style={{fontFamily:'var(--sans)',fontSize:14,fontWeight:700,color:'var(--white)'}}>Perfil encontrado</div>
+                <div style={{fontSize:9,color:'var(--slate)',marginTop:2}}>{p.identity_type} · {p.identity_value}</div>
+              </div>
+              <span className={`badge ${p.risk.risk_label}`}>{p.risk.risk_label}</span>
+            </div>
+            <div className="grid-4" style={{marginBottom:10}}>
+              {[['TX 30d',p.velocity.tx_30d],['Promedio',fmtAmt(p.amounts.avg_30d)],['Score máx',p.risk.score_max_ever],['Fraudes',p.risk.fraud_confirmed]].map(([l,v])=>(
+                <div className="pstat" key={l}><div className="pstat-val">{v}</div><div className="pstat-lbl">{l}</div></div>
+              ))}
+            </div>
+            <div className="sec">Últimas transacciones</div>
+            <table className="tbl">
+              <thead><tr><th>TX ID</th><th>Canal</th><th>Monto</th><th>Score</th><th>Decisión</th><th>Fecha</th></tr></thead>
+              <tbody>
+                {txs.slice(0,8).map(t=>(
+                  <tr key={t.tx_id}>
+                    <td className="mono">{t.tx_id}</td>
+                    <td><span className={`badge ${t.scoring?.risk_level||'LOW'}`}>{t.channel}</span></td>
+                    <td>{fmtAmt(t.amount)}</td>
+                    <td style={{fontFamily:'var(--sans)',fontWeight:700,color:scoreColor(t.scoring?.score_final||0)}}>{t.scoring?.score_final||0}</td>
+                    <td><span className={`badge ${t.scoring?.decision||'APROBADA'}`}>{t.scoring?.decision}</span></td>
+                    <td className="mono">{fmtDate(t.created_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      })()}
+
+      {/* Filters */}
+      <div style={{display:'flex',gap:8,marginBottom:12,alignItems:'center'}}>
+        <span style={{fontSize:9,color:'var(--slate)'}}>Filtrar por riesgo:</span>
+        {['','UNKNOWN','CLEAN','RISKY','FRAUD'].map(r=>(
+          <button key={r} className={`btn ${riskFilter===r?'btn-red':'btn-ghost'}`}
+            style={{padding:'3px 8px',fontSize:8}} onClick={()=>setRisk(r)}>
+            {r||'Todos'}
+          </button>
+        ))}
+        <span style={{marginLeft:'auto',fontSize:9,color:'var(--slate)'}}>{total} perfiles totales</span>
+      </div>
+
+      {loading && <Loading/>}
+
+      {!loading && (
+        <table className="tbl">
+          <thead><tr><th>Identidad</th><th>Tipo</th><th>TX 30d</th><th>Promedio</th><th>Vol 24h</th><th>Score máx</th><th>Fraudes</th><th>Riesgo</th><th>Última TX</th></tr></thead>
+          <tbody>
+            {profiles.map(p=>(
+              <tr key={p.id}>
+                <td className="mono" style={{color:'var(--light)'}}>{p.identity_value}</td>
+                <td><span className="badge UNKNOWN">{p.identity_type}</span></td>
+                <td style={{color:'var(--white)'}}>{p.velocity.tx_30d}</td>
+                <td>{fmtAmt(p.amounts.avg_30d)}</td>
+                <td style={{color:p.amounts.sum_24h>10000?'var(--red)':'var(--light)'}}>{fmtAmt(p.amounts.sum_24h)}</td>
+                <td style={{fontFamily:'var(--sans)',fontWeight:700,color:scoreColor(p.risk.score_max_ever)}}>{p.risk.score_max_ever}</td>
+                <td style={{color:p.risk.fraud_confirmed>0?'var(--red)':'var(--slate)'}}>{p.risk.fraud_confirmed}</td>
+                <td><span className={`badge ${p.risk.risk_label}`}>{p.risk.risk_label}</span></td>
+                <td className="mono">{p.last_seen?fmtDate(p.last_seen):'—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   PAGE: ENTIDADES
+══════════════════════════════════════════ */
+function Entities({onEntityChange, showToast}) {
+  const [entities, setEntities] = useState([]);
+  const [loading, setLoad]      = useState(true);
+  const [creating, setCreate]   = useState(false);
+  const [form, setForm]         = useState({code:'',name:'',identity_type:'account_number',score_alert:400,score_review:600,score_block:800,weight_rules:0.4,weight_ml:0.6});
+  const [editing, setEditing]   = useState(null);
+  const [saving, setSaving]     = useState(false);
+
+  const load = async () => {
+    try {
+      const d = await api('/api/v2/entities');
+      setEntities(d.entities); setLoad(false);
+    } catch(e) { setLoad(false); }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const create = async () => {
+    setSaving(true);
+    try {
+      await api('/api/v2/entities', {method:'POST', body:form});
+      showToast('✅ Entidad creada','ok');
+      setCreate(false); setForm({code:'',name:'',identity_type:'account_number',score_alert:400,score_review:600,score_block:800,weight_rules:0.4,weight_ml:0.6});
+      load(); onEntityChange();
+    } catch(e) { showToast(e.message,'err'); }
+    setSaving(false);
+  };
+
+  const saveEdit = async (code) => {
+    setSaving(true);
+    try {
+      await api(`/api/v2/entities/${code}`, {method:'PATCH', body:editing});
+      showToast('✅ Entidad actualizada','ok');
+      setEditing(null); load();
+    } catch(e) { showToast(e.message,'err'); }
+    setSaving(false);
+  };
+
+  const idTypes = [['account_number','Número de cuenta'],['card_number','Número de tarjeta'],['user_id','ID de usuario'],['device_fingerprint','Device fingerprint']];
+
+  return (
+    <div>
+      <div className="page-title">Configuración de Entidades</div>
+      <div className="page-sub">Define los umbrales y el tipo de identidad para cada banco o fintech</div>
+
+      <button className="btn btn-red" style={{marginBottom:14}} onClick={()=>setCreate(c=>!c)}>
+        {creating?'✕ Cancelar':'+ Nueva entidad'}
+      </button>
+
+      {creating && (
+        <div className="card" style={{marginBottom:14,border:'1px solid rgba(255,59,92,.2)'}}>
+          <div className="sec" style={{marginTop:0}}>Nueva entidad</div>
+          <div className="form-row">
+            <div className="form-field">
+              <label className="form-label">Código único</label>
+              <input className="form-input" placeholder="BANCO_XYZ" value={form.code} onChange={e=>setForm(f=>({...f,code:e.target.value.toUpperCase()}))}/>
+            </div>
+            <div className="form-field">
+              <label className="form-label">Nombre</label>
+              <input className="form-input" placeholder="Banco de Guayaquil" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/>
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-field">
+              <label className="form-label">Tipo de identidad del perfil</label>
+              <select className="form-select" value={form.identity_type} onChange={e=>setForm(f=>({...f,identity_type:e.target.value}))}>
+                {idTypes.map(([v,l])=><option key={v} value={v}>{l}</option>)}
+              </select>
+            </div>
+          </div>
+          <div style={{fontSize:9,color:'var(--slate)',marginBottom:8}}>Umbrales de score (0–999)</div>
+          <div className="form-row" style={{gridTemplateColumns:'1fr 1fr 1fr'}}>
+            {[['Alerta','score_alert','var(--orange)'],['Revisión','score_review','var(--amber)'],['Bloqueo','score_block','var(--red)']].map(([l,k,c])=>(
+              <div className="form-field" key={k}>
+                <label className="form-label" style={{color:c}}>{l} ≥</label>
+                <input className="form-input" type="number" min={0} max={999} value={form[k]} onChange={e=>setForm(f=>({...f,[k]:parseInt(e.target.value)||0}))}/>
+              </div>
+            ))}
+          </div>
+          <div style={{fontSize:9,color:'var(--slate)',marginBottom:8}}>Pesos del modelo (deben sumar 1.0)</div>
+          <div className="form-row" style={{gridTemplateColumns:'1fr 1fr'}}>
+            {[['Reglas heurísticas','weight_rules'],['Modelo ML','weight_ml']].map(([l,k])=>(
+              <div className="form-field" key={k}>
+                <label className="form-label">{l}</label>
+                <input className="form-input" type="number" min={0} max={1} step={0.1} value={form[k]} onChange={e=>setForm(f=>({...f,[k]:parseFloat(e.target.value)||0}))}/>
+              </div>
+            ))}
+          </div>
+          <button className="btn btn-red" disabled={!form.code||!form.name||saving} onClick={create}>
+            {saving?<><Spinner/>Creando...</>:'Crear entidad →'}
+          </button>
+        </div>
+      )}
+
+      {loading && <Loading/>}
+      {entities.map(e=>(
+        <div className="card" key={e.id} style={{marginBottom:10}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:10}}>
+            <div>
+              <div style={{fontFamily:'var(--sans)',fontSize:15,fontWeight:700,color:'var(--white)'}}>{e.name}</div>
+              <div style={{fontSize:9,color:'var(--slate)',marginTop:1}}>Código: <span style={{color:'var(--teal)'}}>{e.code}</span> · Identidad: <span style={{color:'var(--light)'}}>{e.identity_type}</span></div>
+            </div>
+            <div style={{display:'flex',gap:6}}>
+              <button className="btn btn-ghost" style={{padding:'4px 10px',fontSize:9}} onClick={()=>setEditing(editing?.code===e.code?null:{...e,...e.thresholds,...e.weights,code:e.code})}>
+                {editing?.code===e.code?'✕ Cancelar':'Editar'}
+              </button>
+            </div>
+          </div>
+
+          {editing?.code===e.code ? (
+            <>
+              <div className="form-row" style={{gridTemplateColumns:'1fr 1fr 1fr'}}>
+                {[['Alerta ≥','score_alert','var(--orange)'],['Revisión ≥','score_review','var(--amber)'],['Bloqueo ≥','score_block','var(--red)']].map(([l,k,c])=>(
+                  <div className="form-field" key={k}>
+                    <label className="form-label" style={{color:c}}>{l}</label>
+                    <input className="form-input" type="number" min={0} max={999} value={editing[k]||e.thresholds[k.replace('score_','')]}
+                      onChange={ev=>setEditing(ed=>({...ed,[k]:parseInt(ev.target.value)||0}))}/>
+                  </div>
+                ))}
+              </div>
+              <div className="form-row" style={{gridTemplateColumns:'1fr 1fr'}}>
+                {[['Peso reglas','weight_rules'],['Peso ML','weight_ml']].map(([l,k])=>(
+                  <div className="form-field" key={k}>
+                    <label className="form-label">{l}</label>
+                    <input className="form-input" type="number" min={0} max={1} step={0.1} value={editing[k]||e.weights[k.replace('weight_','')]}
+                      onChange={ev=>setEditing(ed=>({...ed,[k]:parseFloat(ev.target.value)||0}))}/>
+                  </div>
+                ))}
+              </div>
+              <button className="btn btn-teal" disabled={saving} onClick={()=>saveEdit(e.code)}>
+                {saving?<><Spinner/>Guardando...</>:'Guardar cambios →'}
+              </button>
+            </>
+          ) : (
+            <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+              {[['ALERTA','≥'+e.thresholds.alert,'var(--orange)'],['REVISIÓN','≥'+e.thresholds.review,'var(--amber)'],['BLOQUEO','≥'+e.thresholds.block,'var(--red)'],
+                ['Peso Reglas',e.weights.rules,'var(--muted)'],['Peso ML',e.weights.ml,'var(--muted)']].map(([l,v,c])=>(
+                <div key={l} style={{background:'var(--bg3)',borderRadius:4,padding:'5px 10px'}}>
+                  <div style={{fontSize:7,color:'var(--slate)',letterSpacing:'.1em'}}>{l}</div>
+                  <div style={{fontFamily:'var(--sans)',fontWeight:700,color:c}}>{v}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   PAGE: MODELO ML
+══════════════════════════════════════════ */
+function ModelPage({entity, showToast}) {
+  const [stats, setStats]     = useState(null);
+  const [versions, setVers]   = useState([]);
+  const [loading, setLoad]    = useState(true);
+  const [training, setTrain]  = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const [s, v] = await Promise.all([api('/api/v2/model/stats'), api('/api/v2/model/versions')]);
+      setStats(s); setVers(v.versions); setLoad(false);
+    } catch(e) { setLoad(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const train = async (ec) => {
+    setTrain(true);
+    try {
+      const r = await api(`/api/v2/model/train${ec?`?entity_code=${ec}`:''}`, {method:'POST'});
+      showToast('🤖 Entrenamiento iniciado en background','ok');
+      setTimeout(load, 3000);
+    } catch(e) { showToast(e.message,'err'); }
+    setTrain(false);
+  };
+
+  if (loading) return <Loading/>;
+
+  return (
+    <div>
+      <div className="page-title">Monitor del Modelo ML</div>
+      <div className="page-sub">GradientBoosting · Re-entrenamiento automático con feedback de analistas</div>
+
+      {stats && (
+        <>
+          <div className="grid-4" style={{marginBottom:16}}>
+            {[
+              ['Labels totales', stats.labels.total, 'var(--teal)'],
+              ['Fraudes confirmados', stats.labels.fraud, 'var(--red)'],
+              ['Falsos positivos', stats.labels.false_positives, 'var(--teal)'],
+              ['Precisión estimada', stats.precision_estimate+'%', stats.precision_estimate>80?'var(--teal)':stats.precision_estimate>60?'var(--amber)':'var(--red)'],
+            ].map(([l,v,c])=>(
+              <div className="card" key={l}>
+                <div className="card-title">{l}</div>
+                <div className="card-val" style={{color:c}}>{v}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Modelo activo */}
+          {stats.latest_model && (
+            <div className="card" style={{marginBottom:14,border:'1px solid rgba(20,184,166,.25)'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+                <div>
+                  <div style={{fontFamily:'var(--sans)',fontSize:14,fontWeight:700,color:'var(--white)'}}>🤖 Modelo activo</div>
+                  <div style={{fontSize:9,color:'var(--teal)',marginTop:1}}>{stats.latest_model.version}</div>
+                </div>
+                <span className="badge CLEAN">ACTIVO</span>
+              </div>
+              <div className="grid-4">
+                {[
+                  ['Samples', stats.latest_model.training.samples],
+                  ['Accuracy', stats.latest_model.metrics.accuracy ? (stats.latest_model.metrics.accuracy*100).toFixed(1)+'%' : '—'],
+                  ['Precision', stats.latest_model.metrics.precision ? (stats.latest_model.metrics.precision*100).toFixed(1)+'%' : '—'],
+                  ['Recall', stats.latest_model.metrics.recall ? (stats.latest_model.metrics.recall*100).toFixed(1)+'%' : '—'],
+                ].map(([l,v])=>(
+                  <div className="pstat" key={l}><div className="pstat-val">{v}</div><div className="pstat-lbl">{l}</div></div>
+                ))}
+              </div>
+              <div style={{marginTop:10,fontSize:9,color:'var(--slate)'}}>Entrenado: {fmtDate(stats.latest_model.trained_at)}</div>
+            </div>
+          )}
+
+          {/* Acciones */}
+          <div className="card" style={{marginBottom:14}}>
+            <div className="card-title">Re-entrenar modelo</div>
+            <div style={{display:'flex',gap:8,marginTop:8,flexWrap:'wrap'}}>
+              <button className="btn btn-teal" disabled={training||!stats.ready_for_training} onClick={()=>train(null)}>
+                {training?<><Spinner/>Entrenando...</>:'🌍 Re-entrenar modelo global'}
+              </button>
+              {entity && (
+                <button className="btn btn-amber" disabled={training} onClick={()=>train(entity)}>
+                  {training?<><Spinner/>Entrenando...</>:`🏛 Re-entrenar modelo de ${entity}`}
+                </button>
+              )}
+            </div>
+            {!stats.ready_for_training && (
+              <div style={{marginTop:8,fontSize:9,color:'var(--amber)'}}>
+                ⚠ Se necesitan mínimo 5 alertas calificadas. Tienes {stats.labels.total}. Califica alertas en el Visor.
+              </div>
+            )}
+          </div>
+
+          {/* Cómo funciona */}
+          <div className="card" style={{marginBottom:14}}>
+            <div className="card-title">Cómo funciona el feedback loop</div>
+            <div style={{marginTop:8,display:'flex',flexDirection:'column',gap:6}}>
+              {[
+                ['1','Transacción entra','El motor califica con reglas + ML → score 0-999'],
+                ['2','Alerta generada','Si score ≥ umbral de entidad, se crea una alerta'],
+                ['3','Analista califica','Marca como Fraude / Falso positivo + nota'],
+                ['4','Modelo aprende','Con ≥5 labels, el modelo se re-entrena automáticamente'],
+                ['5','Mejora continua','El modelo global aprende de TODAS las entidades'],
+              ].map(([n,t,d])=>(
+                <div key={n} style={{display:'flex',gap:10,padding:'6px 0',borderBottom:'1px solid rgba(255,255,255,.04)'}}>
+                  <div style={{width:20,height:20,borderRadius:'50%',background:'var(--teal)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:700,flexShrink:0,color:'#000'}}>{n}</div>
+                  <div>
+                    <div style={{fontSize:10,color:'var(--white)',fontWeight:500}}>{t}</div>
+                    <div style={{fontSize:9,color:'var(--slate)'}}>{d}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Historial de versiones */}
+      <div className="sec">Historial de versiones del modelo</div>
+      {versions.length===0 && <div className="center" style={{height:80}}>Sin versiones registradas aún</div>}
+      <table className="tbl">
+        <thead><tr><th>Versión</th><th>Tipo</th><th>Samples</th><th>Fraud</th><th>FP</th><th>Accuracy</th><th>Precision</th><th>Estado</th><th>Fecha</th></tr></thead>
+        <tbody>
+          {versions.map(v=>(
+            <tr key={v.id}>
+              <td style={{fontSize:9,color:'var(--teal)'}}>{v.version}</td>
+              <td><span className={`badge ${v.model_type==='global'?'CLEAN':'PENDING'}`}>{v.model_type}</span></td>
+              <td>{v.training.samples}</td>
+              <td style={{color:'var(--red)'}}>{v.training.fraud}</td>
+              <td style={{color:'var(--teal)'}}>{v.training.false_positives}</td>
+              <td>{v.metrics.accuracy?(v.metrics.accuracy*100).toFixed(1)+'%':'—'}</td>
+              <td>{v.metrics.precision?(v.metrics.precision*100).toFixed(1)+'%':'—'}</td>
+              <td><span className={`badge ${v.is_active?'CLEAN':'UNKNOWN'}`}>{v.is_active?'ACTIVO':'HISTÓRICO'}</span></td>
+              <td className="mono">{fmtDate(v.trained_at)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   ROOT APP
+══════════════════════════════════════════ */
+
+// ═══════════════════════════════════════════════════════
+//  LOGIN SCREEN
+// ═══════════════════════════════════════════════════════
+function LoginScreen({onLogin, apiUrl, setApiUrl, testApi, apiOk}) {
+  const [mode, setMode]           = React.useState('login');
+  const [email, setEmail]         = React.useState('');
+  const [name, setName]           = React.useState('');
+  const [password, setPassword]   = React.useState('');
+  const [entityCode, setEntityCode] = React.useState('');
+  const [entityName, setEntityName] = React.useState('');
+  const [loading, setLoading]     = React.useState(false);
+  const [error, setError]         = React.useState('');
+  const [success, setSuccess]     = React.useState('');
+
+  const handleLogin = async () => {
+    setLoading(true); setError(''); setSuccess('');
+    try {
+      const r = await fetch(API_BASE + '/api/v2/auth/login', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({email, password})
+      });
+      const d = await r.json();
+      if (!r.ok) { setError(d.detail || 'Error al iniciar sesión'); return; }
+      localStorage.setItem('auth_token', d.access_token);
+      localStorage.setItem('auth_user', JSON.stringify(d.user));
+      AUTH_TOKEN = d.access_token;
+      onLogin(d.user, d.access_token);
+    } catch(e) { setError('No se pudo conectar al backend'); }
+    finally { setLoading(false); }
+  };
+
+  const handleRegister = async () => {
+    setLoading(true); setError(''); setSuccess('');
+    if (!entityCode.trim() || !entityName.trim()) {
+      setError('Debes indicar el código y nombre de tu institución financiera');
+      setLoading(false); return;
+    }
+    try {
+      const r = await fetch(API_BASE + '/api/v2/auth/register', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          email, name, password,
+          requested_entity_code: entityCode.toUpperCase().trim().replace(/\s+/g,'_'),
+          requested_entity_name: entityName.trim()
+        })
+      });
+      const d = await r.json();
+      if (!r.ok) { setError(d.detail || 'Error al registrarse'); return; }
+      setSuccess('✅ Solicitud enviada. El administrador revisará y aprobará tu acceso en breve.');
+      setMode('login');
+    } catch(e) { setError('No se pudo conectar al backend'); }
+    finally { setLoading(false); }
+  };
+
+  const switchToRegister = () => { setMode('register'); setError(''); setSuccess(''); };
+  const switchToLogin    = () => { setMode('login');    setError(''); setSuccess(''); };
+
+  return (
+    <div style={{display:'flex',height:'100vh',background:'var(--bg)',alignItems:'center',justifyContent:'center',flexDirection:'column'}}>
+      {/* Top bar */}
+      <div style={{position:'fixed',top:0,left:0,right:0,background:'var(--bg2)',borderBottom:'1px solid var(--border)',padding:'0 20px',height:52,display:'flex',alignItems:'center',gap:12}}>
+        <div className="logo">Fraud<em style={{color:'var(--red)',fontStyle:'normal'}}>&</em>AML <span style={{color:'var(--slate)',fontWeight:400,fontSize:12}}>Platform</span></div>
+        <input className="api-input" value={apiUrl} onChange={e=>setApiUrl(e.target.value)}
+          onBlur={()=>testApi(apiUrl)} onKeyDown={e=>e.key==='Enter'&&testApi(apiUrl)}
+          placeholder="URL del backend" style={{maxWidth:320,flex:'unset'}}/>
+        <span className={`api-badge ${apiOk==='ok'?'api-ok':apiOk==='err'?'api-err':'api-testing'}`}>
+          {apiOk==='ok'?'● CONECTADO':apiOk==='err'?'✕ ERROR':'… PROBANDO'}
+        </span>
+      </div>
+
+      {/* Card */}
+      <div style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:16,padding:'36px',width:420,marginTop:52,maxHeight:'calc(100vh - 80px)',overflowY:'auto'}}>
+        <div style={{textAlign:'center',marginBottom:24}}>
+          <div style={{fontFamily:'var(--sans)',fontSize:22,fontWeight:800,color:'var(--white)'}}>
+            Fraud<span style={{color:'var(--red)'}}>AML</span>
+          </div>
+          <div style={{color:'var(--slate)',fontSize:11,marginTop:4}}>
+            {mode==='login' ? 'Iniciar sesión en tu cuenta' : 'Solicitar acceso a la plataforma'}
+          </div>
+        </div>
+
+        {/* ── REGISTRO ── */}
+        {mode==='register' && (<>
+          <div style={{marginBottom:12}}>
+            <div style={{fontSize:9,color:'var(--slate)',marginBottom:5,letterSpacing:'.08em'}}>NOMBRE COMPLETO</div>
+            <input value={name} onChange={e=>setName(e.target.value)}
+              placeholder="Tu nombre completo" style={{width:'100%',padding:'9px 12px',fontSize:12}}/>
+          </div>
+
+          {/* Separador entidad */}
+          <div style={{margin:'14px 0 10px',padding:'8px 12px',background:'var(--bg3)',borderRadius:6,border:'1px solid var(--border2)'}}>
+            <div style={{fontSize:9,color:'var(--teal)',letterSpacing:'.1em',marginBottom:8,fontWeight:600}}>🏛 TU INSTITUCIÓN FINANCIERA</div>
+            <div style={{marginBottom:10}}>
+              <div style={{fontSize:9,color:'var(--slate)',marginBottom:5,letterSpacing:'.08em'}}>NOMBRE DE LA INSTITUCIÓN</div>
+              <input value={entityName} onChange={e=>setEntityName(e.target.value)}
+                placeholder="ej: Banco de Guayaquil" style={{width:'100%',padding:'8px 10px',fontSize:11}}/>
+            </div>
+            <div>
+              <div style={{fontSize:9,color:'var(--slate)',marginBottom:5,letterSpacing:'.08em'}}>CÓDIGO ÚNICO (sin espacios)</div>
+              <input value={entityCode}
+                onChange={e=>setEntityCode(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g,''))}
+                placeholder="ej: BANCO_GYE" style={{width:'100%',padding:'8px 10px',fontSize:11,fontFamily:'var(--mono)'}}/>
+              <div style={{fontSize:8,color:'var(--slate)',marginTop:4}}>Solo letras mayúsculas, números y guión bajo</div>
+            </div>
+          </div>
+        </>)}
+
+        {/* Email */}
+        <div style={{marginBottom:12}}>
+          <div style={{fontSize:9,color:'var(--slate)',marginBottom:5,letterSpacing:'.08em'}}>EMAIL</div>
+          <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
+            onKeyDown={e=>e.key==='Enter'&&(mode==='login'?handleLogin():handleRegister())}
+            placeholder="tu@email.com" style={{width:'100%',padding:'9px 12px',fontSize:12}}/>
+        </div>
+
+        {/* Password */}
+        <div style={{marginBottom:20}}>
+          <div style={{fontSize:9,color:'var(--slate)',marginBottom:5,letterSpacing:'.08em'}}>CONTRASEÑA</div>
+          <input type="password" value={password} onChange={e=>setPassword(e.target.value)}
+            onKeyDown={e=>e.key==='Enter'&&(mode==='login'?handleLogin():handleRegister())}
+            placeholder="••••••••" style={{width:'100%',padding:'9px 12px',fontSize:12}}/>
+        </div>
+
+        {error   && <div style={{background:'rgba(255,59,92,.1)',border:'1px solid rgba(255,59,92,.3)',color:'var(--red)',padding:'8px 12px',borderRadius:6,fontSize:11,marginBottom:14}}>{error}</div>}
+        {success && <div style={{background:'rgba(20,184,166,.1)',border:'1px solid rgba(20,184,166,.3)',color:'var(--teal)',padding:'8px 12px',borderRadius:6,fontSize:11,marginBottom:14}}>{success}</div>}
+
+        <button onClick={mode==='login'?handleLogin:handleRegister} disabled={loading}
+          style={{width:'100%',padding:'11px',background:'var(--teal)',color:'#000',border:'none',borderRadius:8,fontSize:12,fontWeight:600,fontFamily:'var(--mono)',opacity:loading?0.7:1,cursor:loading?'default':'pointer'}}>
+          {loading ? '...' : mode==='login' ? 'Iniciar sesión →' : 'Enviar solicitud de acceso →'}
+        </button>
+
+        <div style={{textAlign:'center',marginTop:16,fontSize:10,color:'var(--slate)'}}>
+          {mode==='login' ? (
+            <>¿No tienes cuenta? <span style={{color:'var(--teal)',cursor:'pointer'}} onClick={switchToRegister}>Solicitar acceso</span></>
+          ) : (
+            <>¿Ya tienes cuenta? <span style={{color:'var(--teal)',cursor:'pointer'}} onClick={switchToLogin}>Iniciar sesión</span></>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════
+//  ADMIN PANEL — aprobar/rechazar usuarios pendientes
+// ═══════════════════════════════════════════════════════
+function AdminPanel({showToast, onBack}) {
+  const [users,   setUsers]   = React.useState([]);
+  const [filter,  setFilter]  = React.useState('PENDING');
+  const [loading, setLoading] = React.useState(true);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const ud = await api(`/api/v2/auth/admin/users?status=${filter}`);
+      setUsers(ud.users || []);
+    } catch(e) { showToast('Error cargando usuarios','err'); }
+    finally { setLoading(false); }
+  };
+
+  React.useEffect(()=>{ load(); }, [filter]);
+
+  const approve = async (userId) => {
+    try {
+      const r = await fetch(API_BASE + `/api/v2/auth/admin/users/${userId}/approve`, {
+        method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+AUTH_TOKEN},
+        body: JSON.stringify({})
+      });
+      const d = await r.json();
+      if (!r.ok) { showToast(d.detail || 'Error al aprobar','err'); return; }
+      showToast('✅ Usuario aprobado — entidad creada automáticamente','ok');
+      load();
+    } catch(e) { showToast('Error al aprobar','err'); }
+  };
+
+  const reject = async (userId) => {
+    if (!confirm('¿Rechazar este usuario?')) return;
+    try {
+      await fetch(API_BASE + `/api/v2/auth/admin/users/${userId}/reject`, {
+        method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+AUTH_TOKEN}
+      });
+      showToast('Usuario rechazado','ok');
+      load();
+    } catch(e) { showToast('Error','err'); }
+  };
+
+  const statusColor = {PENDING:'var(--amber)',APPROVED:'var(--teal)',REJECTED:'var(--red)'};
+
+  return (
+    <div style={{padding:28,maxWidth:900,margin:'0 auto'}}>
+      <div style={{display:'flex',alignItems:'center',gap:16,marginBottom:24}}>
+        <button onClick={onBack} style={{background:'var(--bg3)',border:'1px solid var(--border2)',color:'var(--light)',padding:'6px 14px',borderRadius:6,fontSize:11}}>← Volver</button>
+        <h2 style={{fontFamily:'var(--sans)',fontSize:20,fontWeight:700}}>Panel de Usuarios</h2>
+      </div>
+
+      <div style={{display:'flex',gap:8,marginBottom:20}}>
+        {['PENDING','APPROVED','ALL'].map(s=>(
+          <button key={s} onClick={()=>setFilter(s)}
+            style={{padding:'5px 14px',borderRadius:5,fontSize:10,fontFamily:'var(--mono)',
+              background:filter===s?'var(--teal)':'var(--bg3)',
+              color:filter===s?'#000':'var(--muted)',
+              border:filter===s?'none':'1px solid var(--border2)'}}>
+            {s==='PENDING'?'Pendientes':s==='APPROVED'?'Aprobados':'Todos'}
+          </button>
+        ))}
+        <button onClick={load} style={{marginLeft:'auto',padding:'5px 14px',borderRadius:5,fontSize:10,fontFamily:'var(--mono)',background:'var(--bg3)',color:'var(--muted)',border:'1px solid var(--border2)'}}>↻ Recargar</button>
+      </div>
+
+      {loading ? (
+        <div style={{color:'var(--slate)',fontSize:12}}>Cargando...</div>
+      ) : users.length === 0 ? (
+        <div style={{color:'var(--slate)',fontSize:12,textAlign:'center',padding:40}}>
+          No hay usuarios {filter==='PENDING'?'pendientes de aprobación':''}
+        </div>
+      ) : (
+        <div style={{display:'flex',flexDirection:'column',gap:10}}>
+          {users.map(u=>(
+            <div key={u.id} style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:10,padding:'16px 20px'}}>
+              <div style={{display:'flex',alignItems:'flex-start',gap:16,flexWrap:'wrap'}}>
+                {/* Info usuario */}
+                <div style={{flex:1,minWidth:200}}>
+                  <div style={{fontSize:13,color:'var(--white)',fontWeight:600}}>{u.name}</div>
+                  <div style={{fontSize:10,color:'var(--slate)',marginTop:2}}>{u.email}</div>
+                  <div style={{fontSize:9,color:'var(--slate)',marginTop:2}}>{u.created_at?.slice(0,16).replace('T',' ')}</div>
+                </div>
+                {/* Status */}
+                <span style={{fontSize:9,padding:'3px 8px',borderRadius:4,background:'rgba(0,0,0,.3)',
+                  color:statusColor[u.status]||'var(--slate)',border:'1px solid '+(statusColor[u.status]||'var(--slate)'),height:'fit-content'}}>
+                  {u.status}
+                </span>
+              </div>
+
+              {/* Entidad solicitada */}
+              {(u.requested_entity_code || u.entity_code) && (
+                <div style={{marginTop:10,padding:'8px 12px',background:'var(--bg3)',borderRadius:6,border:'1px solid var(--border2)',display:'flex',gap:16,alignItems:'center'}}>
+                  <div style={{fontSize:9,color:'var(--slate)',letterSpacing:'.08em'}}>🏛 ENTIDAD</div>
+                  <div>
+                    <div style={{fontSize:11,color:'var(--white)',fontWeight:600}}>
+                      {u.requested_entity_name || u.entity_code}
+                    </div>
+                    <div style={{fontSize:9,color:'var(--teal)',fontFamily:'var(--mono)'}}>
+                      {u.requested_entity_code || u.entity_code}
+                    </div>
+                  </div>
+                  {u.status === 'APPROVED' && <span style={{marginLeft:'auto',fontSize:8,color:'var(--teal)'}}>✓ Creada</span>}
+                </div>
+              )}
+
+              {!u.requested_entity_code && u.status === 'PENDING' && (
+                <div style={{marginTop:8,padding:'6px 10px',background:'rgba(245,158,11,.08)',border:'1px solid rgba(245,158,11,.2)',borderRadius:5,fontSize:9,color:'var(--amber)'}}>
+                  ⚠ Este usuario no indicó entidad al registrarse. Puedes rechazarlo y pedirle que se registre de nuevo.
+                </div>
+              )}
+
+              {/* Acciones */}
+              {u.status === 'PENDING' && (
+                <div style={{display:'flex',gap:8,marginTop:12}}>
+                  <button onClick={()=>approve(u.id)} disabled={!u.requested_entity_code}
+                    style={{padding:'7px 18px',background:u.requested_entity_code?'var(--teal)':'var(--bg4)',
+                      color:u.requested_entity_code?'#000':'var(--slate)',border:'none',borderRadius:5,fontSize:10,
+                      fontFamily:'var(--mono)',cursor:u.requested_entity_code?'pointer':'default'}}>
+                    ✓ Aprobar y crear entidad
+                  </button>
+                  <button onClick={()=>reject(u.id)}
+                    style={{padding:'7px 18px',background:'var(--red3)',color:'var(--red)',border:'1px solid rgba(255,59,92,.3)',borderRadius:5,fontSize:10,fontFamily:'var(--mono)'}}>
+                    ✗ Rechazar
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   PAGE: CARGA MASIVA DE TRANSACCIONES
+══════════════════════════════════════════ */
+/* ══════════ UPLOAD CON IA ══════════ */
+function UploadPage({entity, showToast, onDeviceResult}) {
+  const [file,setFile]=useState(null);
+  const [rawData,setRawData]=useState(null);
+  const [allRows,setAllRows]=useState([]);
+  const [headers,setHeaders]=useState([]);
+  const [mapping,setMapping]=useState({});
+  const [fileType,setFileType]=useState(null);
+  const [aiAnalyzing,setAiAnalyzing]=useState(false);
+  const [mappingConfirmed,setMappingConfirmed]=useState(false);
+  const [uploading,setUploading]=useState(false);
+  const [result,setResult]=useState(null);
+  const [history,setHistory]=useState(()=>{
+    try{const s=localStorage.getItem('upload_history');return s?JSON.parse(s):[];}catch(e){return [];}
+  });
+  const [showHistory,setShowHistory]=useState(false);
+  const fileRef=useRef();
+
+  const saveToHistory=(entry)=>{
+    setHistory(prev=>{
+      const next=[entry,...prev].slice(0,50);
+      try{localStorage.setItem('upload_history',JSON.stringify(next));}catch(e){}
+      return next;
+    });
+  };
+
+  const TX_REQUIRED=['amount','channel','cardholder','account_number'];
+  const TX_ALL=['tx_id','amount','channel','cardholder','account_number','city','datetime','dest_account','dest_name'];
+  const TX_DESC={tx_id:'ID único de la transacción',amount:'Monto',channel:'Canal (CARD/TRANSFER/ATM)',cardholder:'Nombre del titular',account_number:'Cuenta origen',city:'Ciudad',datetime:'Fecha y hora',dest_account:'Cuenta destino',dest_name:'Nombre destino'};
+  const DEV_FIELDS=['device_id','identity','session_id','bank','device_fingerprint','os','browser','ips'];
+  const DEV_DESC={device_id:'ID único del dispositivo',identity:'Cuenta/usuario',session_id:'ID de sesión',bank:'Banco',device_fingerprint:'Fingerprint del dispositivo',os:'Sistema operativo',browser:'Navegador',ips:'IPs de la sesión'};
+
+  const readFile=(f)=>{
+    setFile(f);setResult(null);setMapping({});setMappingConfirmed(false);setFileType(null);
+    const reader=new FileReader();
+    reader.onload=async(ev)=>{
+      try{
+        const wb=XLSX.read(ev.target.result,{type:'binary'});
+        const ws=wb.Sheets[wb.SheetNames[0]];
+        const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+        if(!rows.length){showToast('Archivo vacío','err');return;}
+        const hdrs=rows[0].map(h=>String(h||'').trim());
+        setHeaders(hdrs);
+        setRawData(rows.slice(1,6));
+        setAllRows(rows.slice(1).filter(r=>r.some(c=>c)));
+        setAiAnalyzing(true);
+        await aiDetectMapping(hdrs,rows.slice(1,4));
+      }catch(e){showToast('Error leyendo archivo: '+e.message,'err');}
+    };
+    reader.readAsBinaryString(f);
+  };
+
+  const aiDetectMapping=async(hdrs,sampleRows)=>{
+    try{
+      const prompt='Archivo Excel con columnas: '+JSON.stringify(hdrs)+'\nFilas de muestra: '+JSON.stringify(sampleRows.slice(0,2))+'\n\nDetermina si este archivo es TRANSACCIONAL (tiene montos, canales de pago) o de DISPOSITIVOS/SESIONES (tiene device_id, fingerprints, IPs).\n\nResponde SOLO con JSON sin texto adicional:\n{"type":"transactional"|"device","mapping":{"campo_sistema":"columna_excel",...}}';
+      const resp=await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:prompt}]})
+      });
+      const data=await resp.json();
+      const text=data.content?.[0]?.text||'';
+      const clean=text.replace(/```json|```/g,'').trim();
+      const parsed=JSON.parse(clean);
+      setFileType(parsed.type||'transactional');
+      setMapping(parsed.mapping||{});
+    }catch(e){
+      // Fallback: detección heurística
+      const hdrsLow=hdrs.map(h=>h.toLowerCase());
+      const isDevice=hdrsLow.some(h=>['device_id','deviceid','fingerprint','device_fingerprint'].includes(h));
+      setFileType(isDevice?'device':'transactional');
+      const m={};
+      if(isDevice){
+        ['device_id','identity','session_id','bank','device_fingerprint','os','browser','ips'].forEach(f=>{
+          const found=hdrs.find(h=>h.toLowerCase().includes(f.split('_')[0]));
+          if(found)m[f]=found;
+        });
+      }
+      setMapping(m);
+    }
+    setAiAnalyzing(false);
+  };
+
+  const analyzeDevices=(rows,hdrs,mp)=>{
+    const idx=(f)=>hdrs.indexOf(mp[f]);
+    const get=(row,f)=>String(row[idx(f)]||'').trim();
+    
+    const deviceMap={};
+    const ipMap={};
+    const fpMap={};
+    
+    rows.forEach(row=>{
+      const did=get(row,'device_id');
+      const identity=get(row,'identity');
+      const ips=get(row,'ips').split(',').map(s=>s.trim()).filter(Boolean);
+      const fp=get(row,'device_fingerprint');
+      const os=get(row,'os');
+      const browser=get(row,'browser');
+      const bank=get(row,'bank');
+      
+      if(!did)return;
+      if(!deviceMap[did])deviceMap[did]={accounts:new Set(),ips:new Set(),fps:new Set(),sessions:0,os,browser,bank};
+      if(identity&&identity!=='-')deviceMap[did].accounts.add(identity);
+      ips.forEach(ip=>{deviceMap[did].ips.add(ip);if(ip){if(!ipMap[ip])ipMap[ip]=new Set();if(identity&&identity!=='-')ipMap[ip].add(identity);}});
+      if(fp){deviceMap[did].fps.add(fp);if(!fpMap[fp])fpMap[fp]=new Set();if(identity&&identity!=='-')fpMap[fp].add(identity);}
+      deviceMap[did].sessions++;
+    });
+    
+    const riskScore=(d)=>{
+      let s=0;
+      if(d.accounts.size>=5)s+=80;else if(d.accounts.size>=3)s+=50;else if(d.accounts.size>=2)s+=30;
+      if(d.ips.size>=5)s+=20;else if(d.ips.size>=3)s+=10;
+      if(d.fps.size>1)s+=15;
+      if(d.sessions>20)s+=10;
+      return Math.min(999,s*9);
+    };
+    
+    const suspiciousDevices=Object.entries(deviceMap)
+      .filter(([,d])=>d.accounts.size>1)
+      .map(([did,d])=>{
+        const rs=riskScore(d);
+        return{device:did,accounts:[...d.accounts],ips:[...d.ips],fingerprints:[...d.fps],sessions:d.sessions,risk:rs,level:rs>=700?'CRITICO':rs>=450?'ALTO':'MEDIO',os:d.os,browser:d.browser,bank:d.bank};
+      }).sort((a,b)=>b.risk-a.risk);
+    
+    const suspiciousIPs=Object.entries(ipMap)
+      .filter(([,s])=>s.size>1)
+      .map(([ip,s])=>({ip,accounts:[...s],count:s.size}))
+      .sort((a,b)=>b.count-a.count);
+    
+    const sharedFPs=Object.entries(fpMap)
+      .filter(([,s])=>s.size>1)
+      .map(([fp,s])=>({fp,accounts:[...s],count:s.size}));
+    
+    const accountDevices={};
+    rows.forEach(row=>{
+      const did=get(row,'device_id');const identity=get(row,'identity');
+      if(!identity||identity==='-'||!did)return;
+      if(!accountDevices[identity])accountDevices[identity]=new Set();
+      accountDevices[identity].add(did);
+    });
+    const multiDeviceAccounts=Object.entries(accountDevices)
+      .filter(([,s])=>s.size>1)
+      .map(([account,s])=>({account,devices:[...s],count:s.size}))
+      .sort((a,b)=>b.count-a.count);
+    
+    // Generar alertas
+    const alerts=[];
+    const id=()=>Date.now()+'_'+Math.random().toString(36).slice(2,7);
+    suspiciousDevices.forEach(d=>{
+      alerts.push({id:id(),type:'DEVICE_SHARING',severity:d.level,title:'Dispositivo compartido entre '+d.accounts.length+' cuentas',detail:'Device '+d.device.slice(0,20)+'... usado por multiples cuentas',risk:d.risk,accounts:d.accounts,ips:d.ips,evidence:[d.device.slice(0,24),...d.accounts.slice(0,3)],status:'PENDING',created_at:new Date().toISOString()});
+    });
+    suspiciousIPs.slice(0,20).forEach(ip=>{
+      const sev=ip.count>=5?'CRITICO':ip.count>=3?'ALTO':'MEDIO';
+      const rs=Math.min(999,(ip.count*120));
+      alerts.push({id:id(),type:'SHARED_IP',severity:sev,title:'IP '+ip.ip+' compartida por '+ip.count+' cuentas',detail:'La misma IP de red fue usada por multiples identidades',risk:rs,accounts:ip.accounts,ips:[ip.ip],evidence:[ip.ip,...ip.accounts.slice(0,3)],status:'PENDING',created_at:new Date().toISOString()});
+    });
+    sharedFPs.slice(0,10).forEach(fp=>{
+      const sev=fp.count>=4?'CRITICO':fp.count>=2?'ALTO':'MEDIO';
+      const rs=Math.min(999,(fp.count*150));
+      alerts.push({id:id(),type:'DUPLICATE_FINGERPRINT',severity:sev,title:'Fingerprint duplicado en '+fp.count+' cuentas',detail:'Mismo fingerprint de dispositivo vinculado a multiples cuentas',risk:rs,accounts:fp.accounts,ips:[],evidence:[fp.fp.slice(0,24),...fp.accounts.slice(0,3)],status:'PENDING',created_at:new Date().toISOString()});
+    });
+    
+    return{type:'device',suspiciousDevices,suspiciousIPs,sharedFPs,multiDeviceAccounts,alerts,totalRows:rows.length,totalDevices:Object.keys(deviceMap).length,totalAccounts:Object.keys(accountDevices).length};
+  };
+
+  const processUpload=async()=>{
+    if(!file)return;
+    setUploading(true);setResult(null);
+    const isDevice=fileType==='device';
+    
+    if(isDevice){
+      // Analisis 100% frontend
+      await new Promise(r=>setTimeout(r,800));
+      const r=analyzeDevices(allRows,headers,mapping);
+      setResult(r);
+      saveToHistory({id:Date.now(),type:'device',filename:file.name,date:new Date().toISOString(),summary:{devices:r.suspiciousDevices.length,ips:r.suspiciousIPs.length,alerts:r.alerts.length,rows:r.totalRows},alerts:r.alerts});
+      if(onDeviceResult)onDeviceResult(r);
+      showToast('Analisis completado: '+r.suspiciousDevices.length+' dispositivos sospechosos','ok');
+      setUploading(false);
+      return;
+    }
+    
+    if(!entity){showToast('Falta entidad','err');setUploading(false);return;}
+    try{
+      const token=getToken();
+      const fd=new FormData();fd.append('file',file);fd.append('mapping',JSON.stringify(mapping));
+      const r=await fetch(API_BASE+'/api/v2/auth/upload',{method:'POST',headers:{'Authorization':'Bearer '+token},body:fd});
+      const d=await r.json();
+      if(!r.ok){showToast(d.detail||'Error procesando','err');setUploading(false);return;}
+      setResult({type:'transactional',...d});
+      if(d.saved>0){
+        saveToHistory({id:Date.now(),type:'transactional',filename:file.name,date:new Date().toISOString(),summary:{saved:d.saved,errors:d.errors,total:d.total},scored:d.scored||[]});
+        showToast(d.saved+' transacciones procesadas','ok');
+      }else showToast('No se proceso ninguna fila valida','err');
+    }catch(e){showToast('Error: '+e.message,'err');}
+    setUploading(false);
+  };
+
+  const riskColor=(l)=>l==='CRITICO'?'var(--red)':l==='ALTO'?'var(--amber)':'var(--orange)';
+  const isDevice=fileType==='device';
+  const currentFields=isDevice?DEV_FIELDS:TX_ALL;
+  const currentDesc=isDevice?DEV_DESC:TX_DESC;
+  const currentRequired=isDevice?['device_id','identity']:TX_REQUIRED;
+  const mappingComplete=currentRequired.every(f=>mapping[f]);
+
+  return(
+    <div>
+      <div className="page-title">📤 Carga Masiva con IA</div>
+      <div className="page-sub">Sube cualquier Excel — la IA detecta el tipo de datos y las columnas automaticamente</div>
+      {!entity&&fileType!=='device'&&<div style={{background:'rgba(245,158,11,.1)',border:'1px solid rgba(245,158,11,.3)',borderRadius:8,padding:'12px 16px',marginBottom:16,fontSize:11,color:'var(--amber)'}}>Necesitas tener una entidad asignada para cargar transacciones</div>}
+
+      {/* PASO 1: SUBIR */}
+      {!file&&(
+        <div className="card">
+          <div className="card-title">Arrastra tu archivo Excel o haz clic para seleccionarlo</div>
+          <div onDrop={e=>{e.preventDefault();const f=e.dataTransfer.files[0];if(f)readFile(f);}} onDragOver={e=>e.preventDefault()} onClick={()=>fileRef.current&&fileRef.current.click()}
+            style={{marginTop:12,border:'2px dashed var(--border2)',borderRadius:10,padding:'48px 24px',textAlign:'center',cursor:'pointer',transition:'all .2s'}}
+            onMouseEnter={e=>e.currentTarget.style.borderColor='var(--teal)'} onMouseLeave={e=>e.currentTarget.style.borderColor='var(--border2)'}>
+            <div style={{fontSize:48,marginBottom:12}}>📂</div>
+            <div style={{fontSize:13,color:'var(--light)',fontWeight:600,marginBottom:6}}>Cualquier archivo Excel (.xlsx)</div>
+            <div style={{fontSize:10,color:'var(--slate)'}}>La IA detecta automaticamente si es transaccional o de dispositivos</div>
+            <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{display:'none'}} onChange={e=>{const f=e.target.files[0];if(f)readFile(f);}}/>
+          </div>
+          <div style={{marginTop:16,display:'flex',gap:8,flexWrap:'wrap'}}>
+            {[['💳 Transaccional','montos, canales, titulares — score de fraude'],['📱 Dispositivos/Sesiones','device_id, IPs, fingerprints — deteccion de compromiso']].map(([t,d])=>(
+              <div key={t} style={{padding:'8px 12px',background:'var(--bg3)',borderRadius:6,fontSize:9,color:'var(--slate)',flex:1}}>
+                <div style={{color:'var(--light)',marginBottom:2}}>{t}</div>{d}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* HISTORIAL */}
+      {!file&&history.length>0&&(
+        <div className="card" style={{marginTop:14}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <div className="card-title" style={{margin:0}}>📋 Historial de cargas</div>
+              <span style={{fontSize:8,padding:'2px 7px',borderRadius:3,background:'var(--bg3)',color:'var(--slate)',border:'1px solid var(--border2)'}}>{history.length}</span>
+            </div>
+            <div style={{display:'flex',gap:6}}>
+              <button className="btn btn-ghost" style={{padding:'3px 10px',fontSize:8}} onClick={()=>setShowHistory(h=>!h)}>{showHistory?'Ocultar':'Ver historial'}</button>
+              <button className="btn btn-ghost" style={{padding:'3px 10px',fontSize:8,color:'var(--red)'}} onClick={()=>{if(!confirm('Borrar historial?'))return;setHistory([]);localStorage.removeItem('upload_history');}}>Limpiar</button>
+            </div>
+          </div>
+          {showHistory&&history.map((h,i)=>(
+            <div key={h.id} style={{padding:'10px 12px',background:'var(--bg3)',borderRadius:8,marginBottom:6,border:'1px solid var(--border)'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:5}}>
+                <div>
+                  <div style={{fontSize:10,color:'var(--white)',fontWeight:600,marginBottom:2}}>{h.type==='device'?'📱':'💳'} {h.filename}</div>
+                  <div style={{fontSize:8,color:'var(--slate)'}}>{new Date(h.date).toLocaleString('es-EC',{dateStyle:'medium',timeStyle:'short'})}</div>
+                </div>
+                <span style={{fontSize:8,padding:'2px 7px',borderRadius:3,background:h.type==='device'?'rgba(168,85,247,.15)':'rgba(20,184,166,.15)',color:h.type==='device'?'var(--purple)':'var(--teal)'}}>{h.type==='device'?'DISPOSITIVOS':'TRANSACCIONAL'}</span>
+              </div>
+              {h.type==='transactional'&&(
+                <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                  {[['Procesadas',h.summary.saved,'var(--teal)'],['Errores',h.summary.errors,h.summary.errors>0?'var(--red)':'var(--slate)'],['Total',h.summary.total,'var(--muted)']].map(([l,v,c])=>(
+                    <div key={l} style={{padding:'4px 10px',background:'var(--bg2)',borderRadius:4,textAlign:'center'}}>
+                      <div style={{fontFamily:'var(--sans)',fontSize:14,fontWeight:700,color:c}}>{v}</div>
+                      <div style={{fontSize:7,color:'var(--slate)'}}>{l}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {h.type==='device'&&(
+                <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                  {[['Dispositivos',h.summary.devices,'var(--red)'],['IPs',h.summary.ips,'var(--amber)'],['Alertas',h.summary.alerts,'var(--orange)'],['Filas',h.summary.rows,'var(--muted)']].map(([l,v,c])=>(
+                    <div key={l} style={{padding:'4px 10px',background:'var(--bg2)',borderRadius:4,textAlign:'center'}}>
+                      <div style={{fontFamily:'var(--sans)',fontSize:14,fontWeight:700,color:c}}>{v}</div>
+                      <div style={{fontSize:7,color:'var(--slate)',maxWidth:80,lineHeight:1.2}}>{l}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {h.type==='transactional'&&h.scored&&h.scored.length>0&&(
+                <details style={{marginTop:8}}>
+                  <summary style={{fontSize:8,color:'var(--teal)',cursor:'pointer',userSelect:'none'}}>Ver {Math.min(h.scored.length,50)} transacciones</summary>
+                  <div style={{maxHeight:200,overflowY:'auto',marginTop:6}}>
+                    <table className="tbl"><thead><tr><th>TX ID</th><th>Monto</th><th>Canal</th><th>Score</th><th>Decision</th></tr></thead>
+                    <tbody>{h.scored.slice(0,50).map(t=>(
+                      <tr key={t.tx_id}><td className="mono">{t.tx_id}</td><td>{fmtAmt(t.amount)}</td>
+                      <td><span className={'badge '+t.risk}>{t.channel}</span></td>
+                      <td style={{fontFamily:'var(--sans)',fontWeight:700,color:scoreColor(t.score)}}>{t.score}</td>
+                      <td><span className={'badge '+t.decision}>{t.decision}</span></td></tr>
+                    ))}</tbody></table>
+                  </div>
+                </details>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* PASO 2: MAPEO */}
+      {file&&!mappingConfirmed&&(
+        <div>
+          <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14}}>
+            <div style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:8,padding:'10px 16px',flex:1,display:'flex',alignItems:'center',gap:12}}>
+              <div style={{fontSize:20}}>{isDevice?'📱':'💳'}</div>
+              <div>
+                <div style={{fontSize:11,color:'var(--white)',fontWeight:600}}>{file.name}</div>
+                {fileType&&<div style={{marginTop:3}}>
+                  <span style={{fontSize:8,padding:'2px 8px',borderRadius:3,background:isDevice?'rgba(168,85,247,.2)':'rgba(20,184,166,.2)',color:isDevice?'var(--purple)':'var(--teal)'}}>
+                    {isDevice?'📱 ANALISIS DE DISPOSITIVOS':'💳 ANALISIS TRANSACCIONAL'}
+                  </span>
+                </div>}
+              </div>
+              {aiAnalyzing&&<div style={{marginLeft:'auto',fontSize:10,color:'var(--teal)'}}>Analizando con IA...</div>}
+              {!aiAnalyzing&&fileType&&<div style={{marginLeft:'auto',fontSize:9,color:'var(--teal)'}}>Mapeadas: {Object.keys(mapping).length}</div>}
+            </div>
+            <button className="btn btn-ghost" onClick={()=>{setFile(null);setRawData(null);setMapping({});setFileType(null);if(fileRef.current)fileRef.current.value='';}}>✕ Cambiar</button>
+          </div>
+
+          {aiAnalyzing?<div className="center" style={{height:120}}><Spinner/>La IA esta clasificando el archivo...</div>:(
+            <>
+              {isDevice&&<div style={{background:'rgba(168,85,247,.08)',border:'1px solid rgba(168,85,247,.2)',borderRadius:8,padding:'10px 14px',marginBottom:12,fontSize:10,color:'var(--purple)'}}>
+                📱 Modo Dispositivos: Se detectaran dispositivos compartidos entre multiples cuentas, IPs sospechosas y fingerprints duplicados. El analisis es 100% local.
+              </div>}
+              <div className="card" style={{marginBottom:12}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+                  <div><div className="card-title" style={{marginBottom:2}}>Mapeo de columnas detectado por IA</div><div style={{fontSize:9,color:'var(--slate)'}}>Verifica que los campos esten correctamente asignados</div></div>
+                  <span style={{fontSize:9,color:mappingComplete?'var(--teal)':'var(--amber)'}}>{mappingComplete?'Listo':'Faltan campos requeridos'}</span>
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                  {currentFields.map(field=>{
+                    const req=currentRequired.includes(field);
+                    return(
+                      <div key={field} style={{background:'var(--bg3)',borderRadius:6,padding:'8px 10px',border:'1px solid '+(mapping[field]?'var(--teal)':'var(--border2)')}}>
+                        <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}><span style={{fontSize:8,color:'var(--slate)',textTransform:'uppercase'}}>{field}</span>{req&&<span style={{fontSize:7,color:'var(--red)'}}>REQUERIDO</span>}</div>
+                        <div style={{fontSize:8,color:'var(--border2)',marginBottom:5}}>{currentDesc[field]||''}</div>
+                        <select value={mapping[field]||''} onChange={e=>setMapping(m=>({...m,[field]:e.target.value||undefined}))} style={{width:'100%',fontSize:9,padding:'4px 6px'}}>
+                          <option value="">-- sin mapear --</option>
+                          {headers.map(h=><option key={h} value={h}>{h}</option>)}
+                        </select>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {rawData&&<div className="card" style={{marginBottom:12}}>
+                <div className="card-title">Vista previa (primeras 5 filas)</div>
+                <div style={{overflowX:'auto',marginTop:8}}>
+                  <table className="tbl"><thead><tr>{headers.map(h=><th key={h}>{h}</th>)}</tr></thead>
+                  <tbody>{rawData.map((row,i)=><tr key={i}>{headers.map((_,j)=><td key={j} style={{fontSize:9,maxWidth:100,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{row[j]}</td>)}</tr>)}</tbody></table>
+                </div>
+              </div>}
+
+              <button className={'btn '+(isDevice?'btn-purple':'btn-red')} style={{width:'100%',padding:'12px'}} disabled={!mappingComplete} onClick={()=>setMappingConfirmed(true)}>
+                {mappingComplete?(isDevice?'Analizar dispositivos →':'Confirmar y procesar →'):'Completa los campos requeridos'}
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* PASO 3: CONFIRMAR */}
+      {file&&mappingConfirmed&&!result&&(
+        <div className="card" style={{textAlign:'center',padding:'40px'}}>
+          <div style={{fontSize:40,marginBottom:16}}>{isDevice?'🔍':'⚡'}</div>
+          <div style={{fontFamily:'var(--sans)',fontSize:16,fontWeight:700,color:'var(--white)',marginBottom:8}}>{isDevice?'Listo para analizar dispositivos':'Listo para scorear'}</div>
+          <div style={{fontSize:10,color:'var(--slate)',marginBottom:24}}>{file.name} · {allRows.length} filas</div>
+          <div style={{display:'flex',gap:10,justifyContent:'center'}}>
+            <button className={'btn '+(isDevice?'btn-purple':'btn-red')} style={{padding:'12px 32px',fontSize:12}} disabled={uploading} onClick={processUpload}>
+              {uploading?<><Spinner/>{isDevice?'Analizando...':'Procesando...'}</>:(isDevice?'Detectar dispositivos comprometidos →':'Procesar y scorear →')}
+            </button>
+            <button className="btn btn-ghost" onClick={()=>setMappingConfirmed(false)}>Ajustar mapeo</button>
+          </div>
+        </div>
+      )}
+
+      {/* RESULTADOS DISPOSITIVOS */}
+      {result&&result.type==='device'&&(()=>{
+        const{suspiciousDevices,suspiciousIPs,sharedFPs,multiDeviceAccounts,alerts,totalRows,totalDevices,totalAccounts}=result;
+        const sevColor=(s)=>s==='CRITICO'?'var(--red)':s==='ALTO'?'var(--amber)':'var(--orange)';
+        return(
+          <div>
+            {alerts&&alerts.length>0&&(
+              <div style={{background:'rgba(255,59,92,.06)',border:'1px solid rgba(255,59,92,.25)',borderRadius:10,padding:'14px 16px',marginBottom:14}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+                  <div>
+                    <div style={{fontFamily:'var(--sans)',fontSize:16,fontWeight:700,color:'var(--white)'}}>🚨 {alerts.length} Alertas generadas</div>
+                    <div style={{fontSize:9,color:'var(--slate)',marginTop:2}}>Guardadas en Otras Alertas</div>
+                  </div>
+                  <div style={{display:'flex',gap:6}}>
+                    {['CRITICO','ALTO','MEDIO'].map(s=>{
+                      const n=alerts.filter(a=>a.severity===s).length;
+                      return n>0?<span key={s} style={{padding:'3px 10px',borderRadius:4,fontSize:9,fontWeight:700,background:s==='CRITICO'?'rgba(255,59,92,.12)':s==='ALTO'?'rgba(245,158,11,.1)':'rgba(249,115,22,.08)',color:sevColor(s)}}>{s} {n}</span>:null;
+                    })}
+                  </div>
+                </div>
+                {alerts.slice(0,5).map((al,i)=>(
+                  <div key={i} style={{background:'var(--bg2)',borderRadius:8,padding:'10px 14px',marginBottom:6,borderLeft:'3px solid '+sevColor(al.severity)}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+                      <div>
+                        <div style={{fontSize:11,color:'var(--white)',fontWeight:600,marginBottom:2}}>{al.title}</div>
+                        <div style={{fontSize:9,color:'var(--slate)'}}>{al.detail}</div>
+                      </div>
+                      <div style={{display:'flex',gap:6,alignItems:'center',flexShrink:0,marginLeft:12}}>
+                        <span style={{fontFamily:'var(--sans)',fontSize:18,fontWeight:800,color:sevColor(al.severity)}}>{al.risk}</span>
+                        <span style={{padding:'2px 8px',borderRadius:3,fontSize:8,fontWeight:700,color:sevColor(al.severity)}}>{al.severity}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {alerts.length>5&&<div style={{fontSize:8,color:'var(--slate)',textAlign:'center',marginTop:4}}>+{alerts.length-5} mas en Otras Alertas</div>}
+              </div>
+            )}
+
+            <div className="grid-4" style={{marginBottom:14}}>
+              {[['Sesiones',totalRows,'var(--muted)'],['Dispositivos',totalDevices,'var(--light)'],['Cuentas',totalAccounts,'var(--teal)'],['Dispositivos sospechosos',suspiciousDevices.length,'var(--red)']].map(([l,v,c])=>(
+                <div className="card" key={l}><div className="card-title">{l}</div><div style={{fontFamily:'var(--sans)',fontSize:24,fontWeight:800,color:c}}>{v}</div></div>
+              ))}
+            </div>
+
+            {suspiciousDevices.length>0&&(
+              <div style={{marginBottom:14}}>
+                <div className="sec" style={{color:'var(--red)'}}>Dispositivos comprometidos ({suspiciousDevices.length})</div>
+                {suspiciousDevices.map((d,i)=>(
+                  <div key={i} style={{background:'var(--bg2)',borderLeft:'3px solid '+riskColor(d.level),borderRadius:8,padding:'12px 14px',marginBottom:8}}>
+                    <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}>
+                      <div>
+                        <div style={{fontFamily:'var(--mono)',fontSize:10,color:'var(--white)',marginBottom:2}}>📱 {d.device}</div>
+                        <div style={{fontSize:9,color:'var(--slate)'}}>{d.os||''} {d.browser?'- '+d.browser:''} {d.bank?'- '+d.bank:''}</div>
+                      </div>
+                      <div style={{textAlign:'right'}}>
+                        <div style={{fontFamily:'var(--sans)',fontSize:20,fontWeight:800,color:riskColor(d.level)}}>{d.risk}</div>
+                        <span style={{fontSize:8,padding:'2px 7px',borderRadius:3,color:riskColor(d.level)}}>{d.level}</span>
+                      </div>
+                    </div>
+                    <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                      <div style={{flex:1,minWidth:160}}>
+                        <div style={{fontSize:8,color:'var(--slate)',marginBottom:4}}>CUENTAS ({d.accounts.length})</div>
+                        {d.accounts.map((a,j)=><div key={j} style={{fontSize:9,padding:'2px 6px',background:'rgba(255,59,92,.1)',borderRadius:3,marginBottom:2}}>{a.slice(0,32)}</div>)}
+                      </div>
+                      <div style={{flex:1,minWidth:160}}>
+                        <div style={{fontSize:8,color:'var(--slate)',marginBottom:4}}>IPs ({d.ips.length})</div>
+                        {d.ips.slice(0,4).map((ip,j)=><div key={j} style={{fontSize:9,padding:'2px 6px',background:'rgba(245,158,11,.1)',borderRadius:3,marginBottom:2}}>{ip}</div>)}
+                        {d.ips.length>4&&<div style={{fontSize:8,color:'var(--slate)'}}>+{d.ips.length-4} mas</div>}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {suspiciousIPs.length>0&&(
+              <div className="card" style={{marginBottom:14}}>
+                <div className="card-title" style={{color:'var(--amber)'}}>IPs compartidas (top 20)</div>
+                <table className="tbl" style={{marginTop:8}}><thead><tr><th>IP</th><th>Cuentas</th><th>Riesgo</th></tr></thead>
+                <tbody>{suspiciousIPs.slice(0,20).map((ip,i)=>(
+                  <tr key={i}><td style={{fontFamily:'var(--mono)',color:'var(--amber)'}}>{ip.ip}</td>
+                  <td>{ip.accounts.slice(0,3).map((a,j)=><span key={j} style={{fontSize:8,padding:'1px 5px',background:'var(--bg3)',borderRadius:2,marginRight:3}}>{a.slice(0,20)}</span>)}{ip.accounts.length>3&&<span style={{fontSize:8,color:'var(--slate)'}}>+{ip.accounts.length-3}</span>}</td>
+                  <td><span style={{fontFamily:'var(--sans)',fontWeight:700,color:ip.count>=4?'var(--red)':ip.count>=2?'var(--amber)':'var(--orange)'}}>{ip.count} cuentas</span></td></tr>
+                ))}</tbody></table>
+              </div>
+            )}
+
+            <div style={{display:'flex',gap:8}}>
+              <button className="btn btn-ghost" onClick={()=>{setFile(null);setResult(null);setMapping({});setMappingConfirmed(false);if(fileRef.current)fileRef.current.value='';}}>Nueva carga</button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* RESULTADOS TRANSACCIONALES */}
+      {result&&result.type==='transactional'&&(
+        <div>
+          <div className="grid-3" style={{marginBottom:12}}>
+            {[['Total filas',result.total,'var(--muted)'],['Procesadas',result.saved,'var(--teal)'],['Con error',result.errors,result.errors>0?'var(--red)':'var(--slate)']].map(([l,v,c])=>(
+              <div className="card" key={l}><div className="card-title">{l}</div><div style={{fontFamily:'var(--sans)',fontSize:28,fontWeight:800,color:c}}>{v}</div></div>
+            ))}
+          </div>
+          {result.scored&&result.scored.length>0&&(()=>{
+            const counts=result.scored.reduce((a,t)=>({...a,[t.decision]:(a[t.decision]||0)+1}),{});
+            return(<div className="card" style={{marginBottom:12}}><div className="card-title">Distribucion de decisiones</div><div style={{display:'flex',gap:8,marginTop:8,flexWrap:'wrap'}}>{Object.entries(counts).map(([d,n])=>(<div key={d} style={{background:'var(--bg3)',borderRadius:6,padding:'8px 14px',textAlign:'center'}}><div style={{fontFamily:'var(--sans)',fontSize:20,fontWeight:800,color:d==='BLOQUEADA'?'var(--red)':d==='REVISION'?'var(--amber)':d==='ALERTA'?'var(--orange)':'var(--teal)'}}>{n}</div><div style={{fontSize:8,color:'var(--slate)',marginTop:2}}>{d}</div></div>))}</div></div>);
+          })()}
+          {result.error_detail&&result.error_detail.length>0&&<div className="card" style={{marginBottom:12,border:'1px solid rgba(255,59,92,.2)'}}><div className="card-title" style={{color:'var(--red)'}}>Filas con error ({result.error_detail.length})</div>{result.error_detail.map((e,i)=>(<div key={i} style={{padding:'5px 0',borderBottom:'1px solid var(--border)',fontSize:9}}><span style={{color:'var(--slate)'}}>Fila {e.row}</span><span style={{color:'var(--red)',marginLeft:8}}>{e.errors&&e.errors.join(', ')}</span></div>))}</div>}
+          {result.scored&&result.scored.length>0&&<div className="card"><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}><div className="card-title" style={{margin:0}}>Preview (primeras {Math.min(result.scored.length,50)})</div><span style={{fontSize:8,color:'var(--slate)'}}>{result.scored.length} total</span></div>
+            <div style={{maxHeight:360,overflowY:'auto'}}><table className="tbl"><thead><tr><th>TX ID</th><th>Monto</th><th>Canal</th><th>Score</th><th>Decision</th></tr></thead>
+            <tbody>{result.scored.slice(0,50).map(t=>(<tr key={t.tx_id}><td className="mono">{t.tx_id}</td><td>{fmtAmt(t.amount)}</td><td><span className={'badge '+t.risk}>{t.channel}</span></td><td style={{fontFamily:'var(--sans)',fontWeight:700,color:scoreColor(t.score)}}>{t.score}</td><td><span className={'badge '+t.decision}>{t.decision}</span></td></tr>))}</tbody></table></div>
+            <div style={{marginTop:8,fontSize:9,color:'var(--teal)'}}>Transacciones en Dashboard y Alertas</div>
+          </div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+/* ══════════ OTHER ALERTS ══════════ */
+function OtherAlerts({alerts, setAlerts, showToast}) {
+  const [filter,setFilter]=useState('ALL');
+  const [typeFilter,setTypeFilter]=useState('ALL');
+  const [sel,setSel]=useState(null);
+
+  const filtered=alerts.filter(a=>{
+    if(filter!=='ALL'&&a.status!==filter)return false;
+    if(typeFilter!=='ALL'&&a.type!==typeFilter)return false;
+    return true;
+  });
+
+  const selAlert=alerts.find(a=>a.id===sel);
+
+  const markReviewed=(id)=>{
+    setAlerts(prev=>{
+      const next=prev.map(a=>a.id===id?{...a,status:'REVIEWED',reviewed_at:new Date().toISOString()}:a);
+      try{localStorage.setItem('device_alerts',JSON.stringify(next.slice(0,500)));}catch(e){}
+      return next;
+    });
+    showToast('Alerta marcada como revisada','ok');
+  };
+
+  const clearAll=()=>{
+    if(!confirm('Eliminar todas las alertas de dispositivos?'))return;
+    setAlerts([]);
+    localStorage.removeItem('device_alerts');
+    setSel(null);
+    showToast('Alertas eliminadas','ok');
+  };
+
+  const sevColor=(s)=>s==='CRITICO'?'var(--red)':s==='ALTO'?'var(--amber)':'var(--orange)';
+  const sevBg=(s)=>s==='CRITICO'?'rgba(255,59,92,.12)':s==='ALTO'?'rgba(245,158,11,.1)':'rgba(249,115,22,.08)';
+  const typeLabel={DEVICE_SHARING:'Dispositivo Compartido',SHARED_IP:'IP Compartida',DUPLICATE_FINGERPRINT:'Fingerprint Duplicado'};
+
+  const pending=alerts.filter(a=>a.status==='PENDING').length;
+  const crit=alerts.filter(a=>a.severity==='CRITICO').length;
+  const alto=alerts.filter(a=>a.severity==='ALTO').length;
+
+  return(
+    <div>
+      <div className="page-title">Otras Alertas</div>
+      <div className="page-sub">Alertas de comportamiento de dispositivos generadas en Carga Masiva</div>
+
+      {alerts.length===0&&(
+        <div className="card" style={{textAlign:'center',padding:'60px',opacity:.5}}>
+          <div style={{fontSize:40,marginBottom:12}}>📭</div>
+          <div style={{fontSize:12,color:'var(--slate)'}}>No hay alertas de dispositivos</div>
+          <div style={{fontSize:10,color:'var(--border2)',marginTop:6}}>Sube un archivo de sesiones en Carga Masiva para generar alertas</div>
+        </div>
+      )}
+
+      {alerts.length>0&&(
+        <>
+          <div className="grid-4" style={{marginBottom:14}}>
+            {[['Total',alerts.length,'var(--muted)'],['Pendientes',pending,'var(--amber)'],['CRITICO',crit,'var(--red)'],['ALTO',alto,'var(--orange)']].map(([l,v,c])=>(
+              <div className="card" key={l}><div className="card-title">{l}</div><div style={{fontFamily:'var(--sans)',fontSize:24,fontWeight:800,color:c}}>{v}</div></div>
+            ))}
+          </div>
+
+          <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
+            {['ALL','PENDING','REVIEWED'].map(s=>(
+              <button key={s} className={'btn '+(filter===s?'btn-red':'btn-ghost')} style={{padding:'4px 12px',fontSize:9}} onClick={()=>setFilter(s)}>{s}</button>
+            ))}
+            <span style={{color:'var(--border2)',margin:'0 4px'}}>|</span>
+            {['ALL','DEVICE_SHARING','SHARED_IP','DUPLICATE_FINGERPRINT'].map(t=>(
+              <button key={t} className={'btn '+(typeFilter===t?'btn-amber':'btn-ghost')} style={{padding:'3px 8px',fontSize:8}} onClick={()=>setTypeFilter(t)}>{t==='ALL'?'TODOS':t.replace('_',' ')}</button>
+            ))}
+            <button className="btn btn-ghost" style={{marginLeft:'auto',padding:'3px 10px',fontSize:8,color:'var(--red)'}} onClick={clearAll}>Limpiar todo</button>
+          </div>
+
+          <div className="split">
+            <div className="split-left">
+              {filtered.length===0&&<div className="center" style={{height:200,color:'var(--slate)'}}>Sin alertas para este filtro</div>}
+              {filtered.map(a=>(
+                <div key={a.id} onClick={()=>setSel(a.id)}
+                  style={{padding:'10px 14px',borderBottom:'1px solid var(--border)',background:sel===a.id?'var(--bg3)':'transparent',cursor:'pointer',borderLeft:'3px solid '+(sel===a.id?sevColor(a.severity):'transparent'),transition:'all .1s'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:10,color:'var(--white)',fontWeight:600,marginBottom:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{a.title}</div>
+                      <div style={{fontSize:8,color:'var(--slate)'}}>{typeLabel[a.type]||a.type}</div>
+                    </div>
+                    <div style={{display:'flex',gap:6,alignItems:'center',flexShrink:0,marginLeft:8}}>
+                      <span style={{fontFamily:'var(--sans)',fontSize:16,fontWeight:800,color:sevColor(a.severity)}}>{a.risk}</span>
+                      <span style={{fontSize:7,padding:'1px 5px',borderRadius:3,background:sevBg(a.severity),color:sevColor(a.severity),fontWeight:700}}>{a.severity}</span>
+                    </div>
+                  </div>
+                  <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+                    {a.evidence&&a.evidence.slice(0,3).map((ev,j)=>(
+                      <span key={j} style={{fontSize:7,padding:'1px 5px',background:'var(--bg3)',borderRadius:3,color:'var(--muted)'}}>{ev.slice(0,24)}</span>
+                    ))}
+                    {a.status==='REVIEWED'&&<span style={{fontSize:7,padding:'1px 5px',background:'rgba(20,184,166,.15)',borderRadius:3,color:'var(--teal)',marginLeft:'auto'}}>Revisada</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="split-right">
+              {!selAlert&&<div className="center" style={{height:'100%',opacity:.4,flexDirection:'column',gap:8}}><div style={{fontSize:32}}>🛡</div><div style={{fontSize:10,color:'var(--slate)'}}>Selecciona una alerta</div></div>}
+              {selAlert&&(
+                <div style={{padding:'16px'}}>
+                  <div style={{background:'var(--bg2)',border:'1px solid '+sevColor(selAlert.severity)+'30',borderLeft:'3px solid '+sevColor(selAlert.severity),borderRadius:8,padding:'14px',marginBottom:12}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:8}}>
+                      <div>
+                        <div style={{fontSize:12,color:'var(--white)',fontWeight:700,marginBottom:4}}>{selAlert.title}</div>
+                        <div style={{fontSize:9,color:'var(--slate)'}}>{selAlert.detail}</div>
+                      </div>
+                      <div style={{textAlign:'right',flexShrink:0,marginLeft:12}}>
+                        <div style={{fontFamily:'var(--sans)',fontSize:28,fontWeight:800,color:sevColor(selAlert.severity)}}>{selAlert.risk}</div>
+                        <span style={{fontSize:8,padding:'3px 9px',borderRadius:4,fontWeight:700,background:sevBg(selAlert.severity),color:sevColor(selAlert.severity)}}>{selAlert.severity}</span>
+                      </div>
+                    </div>
+                    <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:8}}>
+                      <span style={{fontSize:8,padding:'2px 8px',background:'var(--bg3)',borderRadius:3,color:'var(--muted)'}}>{typeLabel[selAlert.type]||selAlert.type}</span>
+                      <span style={{fontSize:8,padding:'2px 8px',background:selAlert.status==='PENDING'?'rgba(245,158,11,.1)':'rgba(20,184,166,.1)',borderRadius:3,color:selAlert.status==='PENDING'?'var(--amber)':'var(--teal)'}}>{selAlert.status}</span>
+                    </div>
+                  </div>
+
+                  {selAlert.accounts&&selAlert.accounts.length>0&&(
+                    <div style={{marginBottom:10}}>
+                      <div className="card-title" style={{marginBottom:6}}>Cuentas afectadas ({selAlert.accounts.length})</div>
+                      {selAlert.accounts.map((a,i)=>(
+                        <div key={i} style={{fontSize:9,padding:'4px 8px',background:'rgba(255,59,92,.08)',borderRadius:4,marginBottom:3,fontFamily:'var(--mono)',color:'var(--light)'}}>{a}</div>
+                      ))}
+                    </div>
+                  )}
+
+                  {selAlert.ips&&selAlert.ips.length>0&&(
+                    <div style={{marginBottom:10}}>
+                      <div className="card-title" style={{marginBottom:6}}>IPs relacionadas</div>
+                      {selAlert.ips.map((ip,i)=>(
+                        <div key={i} style={{fontSize:9,padding:'4px 8px',background:'rgba(245,158,11,.08)',borderRadius:4,marginBottom:3,fontFamily:'var(--mono)',color:'var(--amber)'}}>{ip}</div>
+                      ))}
+                    </div>
+                  )}
+
+                  {selAlert.evidence&&selAlert.evidence.length>0&&(
+                    <div style={{marginBottom:12}}>
+                      <div className="card-title" style={{marginBottom:6}}>Evidencia</div>
+                      <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+                        {selAlert.evidence.map((ev,i)=>(
+                          <span key={i} style={{fontSize:8,padding:'2px 8px',background:'var(--bg3)',borderRadius:3,color:'var(--muted)',border:'1px solid var(--border2)'}}>{ev.slice(0,32)}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {selAlert.status==='PENDING'&&(
+                    <button className="btn btn-teal" style={{width:'100%',padding:'10px'}} onClick={()=>markReviewed(selAlert.id)}>
+                      Marcar como revisada
+                    </button>
+                  )}
+                  {selAlert.status==='REVIEWED'&&selAlert.reviewed_at&&(
+                    <div style={{fontSize:8,color:'var(--teal)',textAlign:'center',padding:'8px',background:'rgba(20,184,166,.08)',borderRadius:6}}>
+                      Revisada: {new Date(selAlert.reviewed_at).toLocaleString('es-EC')}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+
+function App() {
+  const [page,setPage]=useState('dashboard');
+  const [apiUrl,setApiUrl]=useState(API_BASE);
+  const [apiOk,setApiOk]=useState(null);
+  const [entity,setEntity]=useState('DEMO');
+  const [entities,setEntities]=useState([]);
+  const [pending,setPending]=useState(0);
+  const [toast,setToast]=useState(null);
+  const [deviceAlerts,setDeviceAlerts]=useState(()=>{
+    try{const s=localStorage.getItem('device_alerts');return s?JSON.parse(s):[];}catch(e){return [];}
+  });
+  const [user,setUser]=useState(()=>{
+    try{return JSON.parse(localStorage.getItem('auth_user'));}catch(e){return null;}
+  });
+  const [authed,setAuthed]=useState(()=>!!localStorage.getItem('auth_token'));
+
+  const showToast=useCallback((msg,type='ok')=>{
+    setToast({msg,type});setTimeout(()=>setToast(null),3500);
+  },[]);
+
+  const onLogin=useCallback((u,token)=>{setUser(u);setAuthed(true);AUTH_TOKEN=token;},[]);
+
+  const logout=useCallback(()=>{
+    localStorage.removeItem('auth_token');localStorage.removeItem('auth_user');
+    AUTH_TOKEN=null;setUser(null);setAuthed(false);
+  },[]);
+
+  const testApi=useCallback(async(url)=>{
+    setApiOk('testing');
+    try{API_BASE=url;localStorage.setItem('api_base',url);await api('/health');setApiOk('ok');}
+    catch(e){setApiOk('err');}
+  },[]);
+
+  const loadEntities=useCallback(async()=>{
+    try{
+      const d=await api('/api/v2/entities');
+      setEntities(d.entities);
+      if(d.entities.length&&!d.entities.find(e=>e.code===entity))setEntity(d.entities[0].code);
+    }catch(e){}
+  },[entity]);
+
+  const loadPending=useCallback(async()=>{
+    try{
+      const d=await api('/api/v2/alerts?status=PENDING&limit=1'+(entity?'&entity_code='+entity:''));
+      setPending(d.total);
+    }catch(e){}
+  },[entity]);
+
+  useEffect(()=>{
+    testApi(apiUrl);
+    const t=setInterval(()=>{loadEntities();loadPending();},8000);
+    loadEntities();loadPending();
+    return()=>clearInterval(t);
+  },[]);
+
+  useEffect(()=>{loadPending();},[entity,page]);
+
+  const onDeviceResult=useCallback((r)=>{
+    if(!r.alerts||!r.alerts.length)return;
+    setDeviceAlerts(prev=>{
+      const stamped=r.alerts.map(a=>({...a,created_at:a.created_at||new Date().toISOString()}));
+      const merged=[...stamped,...prev];
+      try{localStorage.setItem('device_alerts',JSON.stringify(merged.slice(0,500)));}catch(e){}
+      return merged.slice(0,500);
+    });
+    showToast('🚨 '+r.alerts.length+' alertas guardadas en Otras Alertas','ok');
+    setTimeout(()=>setPage('other_alerts'),1200);
+  },[showToast]);
+
+  const devicePending=deviceAlerts.filter(a=>a.status==='PENDING').length;
+  const totalBadge=pending+devicePending;
+
+  const nav=[
+    {id:'dashboard',icon:'📊',label:'Dashboard'},
+    {id:'alerts',icon:'🔔',label:'Alertas',badge:totalBadge},
+    {id:'other_alerts',icon:'🛡',label:'Otras Alertas',badge:devicePending},
+    {id:'profiles',icon:'👤',label:'Perfiles'},
+    {id:'upload',icon:'📤',label:'Carga Masiva'},
+    {id:'entities',icon:'🏛',label:'Entidades'},
+    {id:'model',icon:'🤖',label:'Modelo ML'},
+  ];
+
+  const activeEntity=user&&user.role!=='superadmin'&&user.entity_code?user.entity_code:entity;
+
+  if(!authed){
+    return <LoginScreen onLogin={onLogin} apiUrl={apiUrl} setApiUrl={setApiUrl} testApi={testApi} apiOk={apiOk}/>;
+  }
+
+  if(page==='admin'){
+    return(
+      <div style={{background:'var(--bg)',minHeight:'100vh'}}>
+        <div className="topbar" style={{display:'flex',alignItems:'center',padding:'0 20px',gap:14,background:'var(--bg2)',borderBottom:'1px solid var(--border)',height:52}}>
+          <div className="logo">Fraud<em>&</em>AML <span style={{color:'var(--slate)',fontWeight:400,fontSize:12}}>Platform</span></div>
+          <div style={{flex:1}}/>
+          <span style={{fontSize:10,color:'var(--slate)'}}>Admin: {user&&user.name}</span>
+          <button onClick={logout} style={{padding:'4px 12px',background:'var(--bg3)',border:'1px solid var(--border2)',color:'var(--slate)',borderRadius:5,fontSize:10,fontFamily:'var(--mono)'}}>Cerrar sesion</button>
+        </div>
+        <AdminPanel showToast={showToast} onBack={()=>setPage('dashboard')}/>
+        {toast&&<Toast msg={toast.msg} type={toast.type}/>}
+      </div>
+    );
+  }
+
+  return(
+    <div className="app">
+      <div className="topbar">
+        <div className="logo">Fraud<em>&</em>AML <span style={{color:'var(--slate)',fontWeight:400,fontSize:12}}>Platform</span></div>
+        <div className="topbar-api">
+          <input className="api-input" value={apiUrl} onChange={e=>setApiUrl(e.target.value)} onBlur={()=>testApi(apiUrl)} onKeyDown={e=>e.key==='Enter'&&testApi(apiUrl)} placeholder="URL del backend (Railway)"/>
+          <span className={'api-badge '+(apiOk==='ok'?'api-ok':apiOk==='err'?'api-err':'api-testing')}>
+            {apiOk==='ok'?'CONECTADO':apiOk==='err'?'ERROR':'PROBANDO'}
+          </span>
+        </div>
+        <div className="topbar-right">
+          <div className="pulse"/><span>LIVE</span>
+          <span style={{color:'var(--border2)'}}>|</span>
+          <span style={{color:'var(--teal)',fontSize:9}}>{user&&user.name} - {user&&user.role}</span>
+          {user&&user.role==='superadmin'&&(
+            <button onClick={()=>setPage('admin')} style={{padding:'3px 10px',background:'var(--purple3)',border:'1px solid rgba(168,85,247,.3)',color:'var(--purple)',borderRadius:4,fontSize:9,fontFamily:'var(--mono)'}}>
+              Usuarios
+            </button>
+          )}
+          <button onClick={logout} style={{padding:'3px 10px',background:'var(--bg3)',border:'1px solid var(--border2)',color:'var(--slate)',borderRadius:4,fontSize:9,fontFamily:'var(--mono)'}}>
+            Salir
+          </button>
+        </div>
+      </div>
+
+      <div className="sidebar">
+        <div className="sidebar-entity">
+          <div className="entity-label">Entidad activa</div>
+          {user&&user.role==='superadmin'?(
+            <select className="entity-select" value={entity} onChange={e=>setEntity(e.target.value)}>
+              {entities.map(e=><option key={e.id} value={e.code}>{e.name}</option>)}
+              {entities.length===0&&<option value="DEMO">DEMO (cargando...)</option>}
+            </select>
+          ):(
+            <div className="entity-select" style={{padding:'6px 10px',fontSize:11,color:'var(--teal)',cursor:'default'}}>
+              {user&&user.entity_code||'Sin entidad'}
+            </div>
+          )}
+        </div>
+        {nav.map(n=>(
+          <div key={n.id} className={'nav-item '+(page===n.id?'active':'')} onClick={()=>setPage(n.id)}>
+            <span className="nav-icon">{n.icon}</span>
+            {n.label}
+            {n.badge>0&&<span className="nav-badge">{n.badge}</span>}
+          </div>
+        ))}
+        <div style={{marginTop:'auto',padding:'10px 14px',fontSize:8,color:'var(--slate)',borderTop:'1px solid var(--border)'}}>
+          <div>Score: 0-999</div>
+          <div style={{marginTop:2}}>Modelo: GradientBoosting</div>
+        </div>
+      </div>
+
+      <div className="main">
+        {page==='dashboard'&&<Dashboard entity={activeEntity} toast={showToast}/>}
+        {page==='alerts'&&<Alerts entity={activeEntity} showToast={showToast}/>}
+        {page==='other_alerts'&&<OtherAlerts alerts={deviceAlerts} setAlerts={setDeviceAlerts} showToast={showToast}/>}
+        {page==='profiles'&&<Profiles entity={activeEntity} showToast={showToast}/>}
+        {page==='upload'&&<UploadPage entity={activeEntity} showToast={showToast} onDeviceResult={onDeviceResult}/>}
+        {page==='entities'&&<Entities onEntityChange={loadEntities} showToast={showToast}/>}
+        {page==='model'&&<ModelPage entity={activeEntity} showToast={showToast}/>}
+      </div>
+
+      {toast&&<Toast msg={toast.msg} type={toast.type}/>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
 </body>
 </html>
