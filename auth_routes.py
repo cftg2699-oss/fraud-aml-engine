@@ -350,9 +350,17 @@ async def upload_transactions(
                 "total":len(errors),"saved":0,"errors":len(errors),"error_detail":errors[:20],"scored":[]}
 
     from main import score_transaction_internal
+    from models import TransactionRecord
     scored = []
     for payload in results:
         try:
+            # Si el tx_id ya existe en la BD, generar uno nuevo automáticamente
+            existing = db.query(TransactionRecord).filter(
+                TransactionRecord.tx_id == payload["tx_id"]
+            ).first()
+            if existing:
+                payload["tx_id"] = payload["tx_id"] + "-" + uuid.uuid4().hex[:6].upper()
+
             result = score_transaction_internal(payload, db)
             scored.append({
                 "tx_id":    payload["tx_id"],
@@ -364,7 +372,16 @@ async def upload_transactions(
             })
             saved += 1
         except Exception as e:
-            errors.append({"tx_id": payload["tx_id"], "errors": [str(e)]})
+            # Rollback de la sesión para que las siguientes filas no fallen en cascada
+            try:
+                db.rollback()
+            except Exception:
+                pass
+            err_msg = str(e)
+            # Simplificar mensaje de error de duplicado
+            if "UNIQUE constraint failed" in err_msg or "unique constraint" in err_msg.lower():
+                err_msg = f"tx_id '{payload['tx_id']}' duplicado — ya existe en la base de datos"
+            errors.append({"tx_id": payload["tx_id"], "errors": [err_msg]})
 
     return {
         "status":       "ok",
