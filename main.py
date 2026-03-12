@@ -6,7 +6,8 @@ import sys, os
 sys.path.insert(0, os.path.dirname(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "services"))
 
-from fastapi import FastAPI, HTTPException, Depends, Query, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Depends, Query, BackgroundTasks, Request
+from collections import defaultdict
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from sqlalchemy.orm import Session
@@ -69,6 +70,33 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ── Rate limiter simple en memoria ────────────────────────────
+# Sin dependencias externas. Ventana deslizante por IP.
+import time as _time
+_rate_store: dict = defaultdict(list)
+
+def _check_rate(request: Request, max_calls: int, window_sec: int):
+    """Lanza 429 si la IP supera max_calls en window_sec segundos."""
+    ip  = request.client.host if request.client else "unknown"
+    now = _time.time()
+    calls = _rate_store[ip]
+    # Limpiar llamadas fuera de la ventana
+    _rate_store[ip] = [t for t in calls if now - t < window_sec]
+    if len(_rate_store[ip]) >= max_calls:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Demasiadas solicitudes. Máximo {max_calls} por {window_sec}s. Intenta más tarde."
+        )
+    _rate_store[ip].append(now)
+
+def rate_limit_upload(request: Request):
+    """Max 5 uploads por IP cada 60 segundos."""
+    _check_rate(request, max_calls=5, window_sec=60)
+
+def rate_limit_score(request: Request):
+    """Max 60 scorings por IP cada 60 segundos (1/seg)."""
+    _check_rate(request, max_calls=60, window_sec=60)
 
 # Auth router
 app.include_router(auth_router)
@@ -148,7 +176,7 @@ def delete_entity(code: str, db: Session = Depends(get_db)):
 # ═══════════════════════════════════════════════════════════
 
 @app.post("/api/v2/score", tags=["Scoring"], response_model=TransactionOut)
-def score_transaction(tx: TransactionIn, db: Session = Depends(get_db)):
+def score_transaction(tx: TransactionIn, request: Request, db: Session = Depends(get_db), _rl=Depends(rate_limit_score)):
     entity = db.query(Entity).filter(Entity.code == tx.entity_code).first()
     if not entity:
         raise HTTPException(404, f"Entidad '{tx.entity_code}' no existe. Créala primero en /api/v2/entities")
