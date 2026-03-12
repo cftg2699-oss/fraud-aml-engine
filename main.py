@@ -463,7 +463,7 @@ def get_stats(entity_code: Optional[str] = None, db: Session = Depends(get_db), 
     avg_ms    = db.query(sqlfunc.avg(TransactionRecord.processing_ms)).scalar() or 0
 
     channels = {}
-    for ch in ["CARD","TRANSFER","WALLET","ATM"]:
+    for ch in ["CARD","TRANSFER","WALLET","ATM","DIGITAL_BANKING"]:
         channels[ch] = q.filter(TransactionRecord.channel == ch).count()
 
     # Last 24h volume
@@ -552,11 +552,12 @@ def simulate(
                        weight_rules=0.4, weight_ml=0.6)
         db.add(entity); db.flush()
 
-    channels  = ["CARD","TRANSFER","WALLET","ATM"]
+    channels  = ["CARD","TRANSFER","WALLET","ATM","DIGITAL_BANKING"]
     subtypes  = {"CARD":["POS","ECOMMERCE","CONTACTLESS"],
                  "TRANSFER":["ACH","WIRE","INTERBANK"],
                  "WALLET":["P2P","QR","PAYMENT"],
-                 "ATM":["WITHDRAWAL"]}
+                 "ATM":["WITHDRAWAL"],
+                 "DIGITAL_BANKING":["ONLINE_TRANSFER","BILL_PAYMENT","MOBILE_RECHARGE"]}
     merchants = ["Amazon","Walmart","Shell","Apple","Netflix","Rappi","Steam","Uber","MercadoLibre","Airbnb"]
     cities    = ["Guayaquil","Bogotá","Lima","São Paulo","Miami","Madrid","Buenos Aires","Ciudad de México"]
     names     = ["Carlos M.","Ana G.","Luis R.","María L.","José M.","Isabel D.","Roberto S.","Carmen T."]
