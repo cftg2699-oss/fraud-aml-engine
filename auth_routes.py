@@ -494,3 +494,4 @@ def download_template():
             "Las fechas aceptan: YYYY-MM-DD HH:MM, YYYY-MM-DDTHH:MM:SS, DD/MM/YYYY",
         ]
     }
+# v2 - csv support
