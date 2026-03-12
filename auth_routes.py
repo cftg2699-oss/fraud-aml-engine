@@ -362,13 +362,14 @@ async def upload_transactions(
                 payload["tx_id"] = payload["tx_id"] + "-" + uuid.uuid4().hex[:6].upper()
 
             result = score_transaction_internal(payload, db)
+            # score_transaction_internal devuelve claves en el root (no anidadas en "scoring")
             scored.append({
                 "tx_id":    payload["tx_id"],
                 "amount":   payload["amount"],
                 "channel":  payload["channel"],
-                "score":    result["scoring"]["score_final"],
-                "decision": result["scoring"]["decision"],
-                "risk":     result["scoring"]["risk_level"],
+                "score":    result.get("score_final", result.get("scoring", {}).get("score_final", 0)),
+                "decision": result.get("decision",   result.get("scoring", {}).get("decision",   "APROBADA")),
+                "risk":     result.get("risk_level",  result.get("scoring", {}).get("risk_level",  "LOW")),
             })
             saved += 1
         except Exception as e:
