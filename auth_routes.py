@@ -314,13 +314,21 @@ async def upload_transactions(
             errors.append({"row": i, "tx_id": tx_id, "errors": row_errors})
             continue
 
+        tx_dt = datetime.utcnow()
         if isinstance(dt_raw, datetime):
             tx_dt = dt_raw
-        else:
-            try:
-                tx_dt = datetime.fromisoformat(str(dt_raw).replace(" ", "T"))
-            except Exception:
-                tx_dt = datetime.utcnow()
+        elif dt_raw:
+            raw_str = str(dt_raw).strip().replace(" ", "T")
+            # Intentar múltiples formatos, ignorar años imposibles
+            for fmt in [None, "%Y-%m-%dT%H:%M", "%Y-%m-%d", "%d/%m/%Y %H:%M", "%d/%m/%Y"]:
+                try:
+                    parsed = datetime.fromisoformat(raw_str) if fmt is None else datetime.strptime(str(dt_raw).strip(), fmt)
+                    # Validar que el año sea razonable (1990-2100)
+                    if 1990 <= parsed.year <= 2100:
+                        tx_dt = parsed
+                        break
+                except Exception:
+                    continue
 
         payload = {
             "entity_code":    entity_code or "DEMO",
