@@ -172,7 +172,7 @@ def score_transaction(tx: TransactionIn, db: Session = Depends(get_db)):
     )
     db.add(record)
 
-    if result["risk_level"] in ("HIGH","CRITICAL"):
+    if result["risk_level"] in ("HIGH","CRITICAL","MEDIUM"):
         top = (result["triggered_rules"] + result["aml_flags"])
         db.add(Alert(
             tx_id=result["tx_id"], entity_id=entity.id, profile_id=profile.id,
@@ -607,7 +607,7 @@ def simulate(
         )
         db.add(record)
 
-        if result["risk_level"] in ("HIGH","CRITICAL"):
+        if result["risk_level"] in ("HIGH","CRITICAL","MEDIUM"):
             top = result["triggered_rules"] + result["aml_flags"]
             db.add(Alert(
                 tx_id=result["tx_id"], entity_id=entity.id, profile_id=profile.id,
@@ -680,7 +680,7 @@ def score_transaction_internal(payload: dict, db: Session):
     )
     db.add(record)
 
-    if result["risk_level"] in ("HIGH", "CRITICAL"):
+    if result["risk_level"] in ("HIGH", "CRITICAL", "MEDIUM"):
         top = result["triggered_rules"] + result["aml_flags"]
         db.add(Alert(
             tx_id=final_tx_id, entity_id=entity.id, profile_id=profile.id,
