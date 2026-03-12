@@ -386,99 +386,187 @@ function Profiles({entity,channel,showToast}){
 
 /* ══════════ UPLOAD CON IA ══════════ */
 function UploadPage({entity,showToast}){
-  const [file,setFile]=useState(null);const [rawData,setRawData]=useState(null);const [headers,setHeaders]=useState([]);const [mapping,setMapping]=useState({});const [mappingConfirmed,setMappingConfirmed]=useState(false);const [aiAnalyzing,setAiAnalyzing]=useState(false);const [uploading,setUploading]=useState(false);const [result,setResult]=useState(null);const fileRef=useRef();
-  const REQUIRED_FIELDS=['amount','channel','cardholder','account_number'];
-  const OPTIONAL_FIELDS=['tx_id','city','datetime','dest_account','dest_name'];
-  const ALL_FIELDS=[...REQUIRED_FIELDS,...OPTIONAL_FIELDS];
-  const FIELD_DESCRIPTIONS={amount:'Monto de la transacción (número)',channel:'Canal (CARD/TRANSFER/ATM/WALLET/DIGITAL_BANKING)',cardholder:'Nombre del titular',account_number:'Cuenta o tarjeta origen',tx_id:'ID único (se genera si no hay)',city:'Ciudad',datetime:'Fecha y hora',dest_account:'Cuenta destino (solo TRANSFER)',dest_name:'Nombre destino (solo TRANSFER)'};
+  const [file,setFile]=useState(null);const [rawData,setRawData]=useState(null);const [allRows,setAllRows]=useState([]);const [headers,setHeaders]=useState([]);const [mapping,setMapping]=useState({});const [mappingConfirmed,setMappingConfirmed]=useState(false);const [aiAnalyzing,setAiAnalyzing]=useState(false);const [uploading,setUploading]=useState(false);const [result,setResult]=useState(null);const [fileType,setFileType]=useState(null); // 'transactional' | 'device'
+  const fileRef=useRef();
+
+  // Campos transaccionales
+  const TX_REQUIRED=['amount','channel','cardholder','account_number'];
+  const TX_OPTIONAL=['tx_id','city','datetime','dest_account','dest_name'];
+  const TX_ALL=[...TX_REQUIRED,...TX_OPTIONAL];
+  const TX_DESC={amount:'Monto (número)',channel:'Canal (CARD/TRANSFER/ATM/WALLET/DIGITAL_BANKING)',cardholder:'Nombre del titular',account_number:'Cuenta o tarjeta origen',tx_id:'ID único (se genera si falta)',city:'Ciudad',datetime:'Fecha y hora',dest_account:'Cuenta destino (solo TRANSFER)',dest_name:'Nombre destino (solo TRANSFER)'};
+
+  // Campos de dispositivo/sesión
+  const DEV_FIELDS=['device_id','identity','session_id','device_fingerprint','ips','bank','os','browser','screen','gpu_renderers'];
+  const DEV_DESC={device_id:'ID del dispositivo',identity:'ID de la cuenta/usuario',session_id:'ID de sesión',device_fingerprint:'Fingerprint del dispositivo',ips:'IPs de la sesión',bank:'Banco/Institución',os:'Sistema operativo',browser:'Navegador',screen:'Resolución de pantalla',gpu_renderers:'GPU del dispositivo'};
 
   const readFile=async(f)=>{
-    setFile(f);setRawData(null);setMapping({});setMappingConfirmed(false);setResult(null);
+    setFile(f);setRawData(null);setAllRows([]);setMapping({});setMappingConfirmed(false);setResult(null);setFileType(null);
     try{
       const ab=await f.arrayBuffer();
       const wb=XLSX.read(ab,{type:'array'});
       const ws=wb.Sheets[wb.SheetNames[0]];
       const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
-      if(!rows||rows.length<2){showToast('El archivo está vacío o no tiene datos','err');return;}
+      if(!rows||rows.length<2){showToast('El archivo está vacío','err');return;}
       const hdrs=rows[0].map(h=>String(h||'').trim());
       setHeaders(hdrs);
-      setRawData(rows.slice(1,6)); // preview 5 rows
-      // IA analiza automáticamente
-      await aiDetectMapping(hdrs,rows.slice(1,4));
+      setRawData(rows.slice(1,6));
+      setAllRows(rows.slice(1));
+      await aiDetectAll(hdrs,rows.slice(1,4));
     }catch(e){showToast('Error leyendo archivo: '+e.message,'err');}
   };
 
-  const aiDetectMapping=async(hdrs,sampleRows)=>{
+  const aiDetectAll=async(hdrs,sampleRows)=>{
     setAiAnalyzing(true);
     try{
       const sampleStr=sampleRows.map(r=>r.join(' | ')).join('\n');
-      const prompt=`Eres un experto en datos bancarios. Tengo un archivo Excel con estas columnas:
-${hdrs.map((h,i)=>`[${i}] "${h}"`).join(', ')}
+      const prompt=`Eres un experto en fraude bancario y análisis de datos. Analiza este archivo Excel.
 
-Muestra de datos (primeras filas):
+Columnas: ${hdrs.map((h,i)=>'['+i+'] "'+h+'"').join(', ')}
+Muestra de datos:
 ${sampleStr}
 
-Mapea cada campo del sistema a la columna más apropiada del archivo.
-Campos del sistema: ${ALL_FIELDS.join(', ')}
+TAREA 1: Detecta el TIPO de archivo:
+- "transactional": tiene montos, canales de pago, titulares (archivo de transacciones financieras)
+- "device": tiene device_id, fingerprints, IPs, sesiones (archivo de actividad de dispositivos/sesiones)
 
-Responde SOLO con JSON válido, sin texto extra:
-{"amount":"nombre_columna_exacto","channel":"nombre_columna_exacto","cardholder":"nombre_columna_exacto","account_number":"nombre_columna_exacto","tx_id":"nombre_o_null","city":"nombre_o_null","datetime":"nombre_o_null","dest_account":"nombre_o_null","dest_name":"nombre_o_null"}
+TAREA 2: Si es "transactional", mapea los campos: amount, channel, cardholder, account_number, tx_id, city, datetime, dest_account, dest_name
+Si es "device", mapea los campos: device_id, identity, session_id, device_fingerprint, ips, bank, os, browser, screen, gpu_renderers
 
-Si no encuentras una columna adecuada para un campo, usa null.`;
+Responde SOLO con JSON sin texto extra:
+{"file_type":"transactional_o_device","mapping":{"campo":"columna_exacta_o_null",...}}`;
 
       const resp=await fetch('https://api.anthropic.com/v1/messages',{
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:500,messages:[{role:'user',content:prompt}]})
+        body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,messages:[{role:'user',content:prompt}]})
       });
       const d=await resp.json();
       const txt=d.content?.[0]?.text||'{}';
       const clean=txt.replace(/```json|```/g,'').trim();
       const detected=JSON.parse(clean);
-      // Filtrar nulls
+      const ft=detected.file_type||'transactional';
+      setFileType(ft);
       const m={};
-      Object.entries(detected).forEach(([k,v])=>{if(v&&hdrs.includes(v))m[k]=v;});
+      Object.entries(detected.mapping||{}).forEach(([k,v])=>{if(v&&hdrs.includes(v))m[k]=v;});
       setMapping(m);
     }catch(e){
-      // Fallback: mapeo por nombre exacto/similar
+      // Fallback: detectar por nombres de columna
+      const hdrsLow=hdrs.map(h=>h.toLowerCase());
+      const isDevice=hdrsLow.some(h=>['device_id','fingerprint','device_fingerprint','session_id'].includes(h));
+      setFileType(isDevice?'device':'transactional');
       const m={};
-      const normalize=s=>String(s).toLowerCase().replace(/[^a-z0-9]/g,'');
-      const aliases={amount:['amount','monto','valor','importe','total'],channel:['channel','canal','tipo','type'],cardholder:['cardholder','titular','nombre','name','cliente'],account_number:['account_number','account','cuenta','tarjeta','card','numero'],tx_id:['tx_id','txid','id','transaccion','transaction_id'],city:['city','ciudad','localidad'],datetime:['datetime','date','fecha','timestamp','hora'],dest_account:['dest_account','cuenta_destino','destino_cuenta','beneficiario_cuenta'],dest_name:['dest_name','nombre_destino','beneficiario','beneficiary']};
-      Object.entries(aliases).forEach(([field,names])=>{const match=hdrs.find(h=>names.includes(normalize(h)));if(match)m[field]=match;});
+      const aliases_tx={amount:['amount','monto','valor','importe','total'],channel:['channel','canal','tipo'],cardholder:['cardholder','titular','nombre','name'],account_number:['account_number','cuenta','account','tarjeta'],tx_id:['tx_id','id','transaccion'],city:['city','ciudad'],datetime:['datetime','fecha','date']};
+      const aliases_dev={device_id:['device_id','deviceid','device'],identity:['identity','id','account','cuenta','user_id'],session_id:['session_id','sessionid','session'],device_fingerprint:['device_fingerprint','fingerprint'],ips:['ips','ip','ip_address'],bank:['bank','banco'],os:['os','sistema','system'],browser:['browser','navegador'],screen:['screen','pantalla','resolution'],gpu_renderers:['gpu_renderers','gpu']};
+      const alm=isDevice?aliases_dev:aliases_tx;
+      Object.entries(alm).forEach(([field,names])=>{const match=hdrs.find(h=>names.includes(h.toLowerCase()));if(match)m[field]=match;});
       setMapping(m);
     }
     setAiAnalyzing(false);
   };
 
+  // Análisis de dispositivos — todo en el frontend
+  const analyzeDevices=()=>{
+    const get=(row,field)=>{
+      if(mapping[field]){const idx=headers.indexOf(mapping[field]);if(idx>=0)return String(row[idx]||'').trim();}
+      return '';
+    };
+
+    // Construir índices
+    const deviceToAccounts={};
+    const accountToDevices={};
+    const ipToAccounts={};
+    const fingerprintToAccounts={};
+    const sessionsByDevice={};
+
+    allRows.forEach(row=>{
+      const device=get(row,'device_id');
+      const identity=get(row,'identity');
+      const ipsRaw=get(row,'ips');
+      const fp=get(row,'device_fingerprint');
+      const session=get(row,'session_id');
+      if(!device)return;
+      if(!deviceToAccounts[device])deviceToAccounts[device]={accounts:new Set(),sessions:[],fps:new Set(),ips:new Set(),bank:get(row,'bank'),os:get(row,'os'),browser:get(row,'browser')};
+      if(identity&&identity!=='-')deviceToAccounts[device].accounts.add(identity);
+      if(session)deviceToAccounts[device].sessions.push(session);
+      if(fp)deviceToAccounts[device].fps.add(fp);
+      ipsRaw.split(',').forEach(ip=>{ip=ip.trim();if(ip){deviceToAccounts[device].ips.add(ip);if(!ipToAccounts[ip])ipToAccounts[ip]=new Set();if(identity&&identity!=='-')ipToAccounts[ip].add(identity);}});
+      if(fp){if(!fingerprintToAccounts[fp])fingerprintToAccounts[fp]=new Set();if(identity&&identity!=='-')fingerprintToAccounts[fp].add(identity);}
+      if(identity&&identity!=='-'){if(!accountToDevices[identity])accountToDevices[identity]=new Set();accountToDevices[identity].add(device);}
+    });
+
+    // Dispositivos sospechosos: usados por múltiples cuentas
+    const suspiciousDevices=Object.entries(deviceToAccounts)
+      .filter(([,v])=>v.accounts.size>1)
+      .map(([device,v])=>{
+        const riskScore=Math.min(999,200+v.accounts.size*80+(v.fps.size>1?100:0)+(v.ips.size>5?100:0));
+        return{device,accounts:[...v.accounts],sessions:v.sessions.length,fingerprints:[...v.fps],ips:[...v.ips],bank:v.bank,os:v.os,browser:v.browser,risk:riskScore,level:riskScore>=700?'CRÍTICO':riskScore>=500?'ALTO':'MEDIO'};
+      })
+      .sort((a,b)=>b.accounts.length-a.accounts.length);
+
+    // IPs compartidas sospechosas
+    const suspiciousIPs=Object.entries(ipToAccounts)
+      .filter(([,v])=>v.size>1)
+      .map(([ip,accounts])=>({ip,accounts:[...accounts],count:accounts.size}))
+      .sort((a,b)=>b.count-a.count)
+      .slice(0,50);
+
+    // Fingerprints duplicados
+    const sharedFPs=Object.entries(fingerprintToAccounts)
+      .filter(([,v])=>v.size>1)
+      .map(([fp,accounts])=>({fp,accounts:[...accounts]}));
+
+    // Cuentas con múltiples dispositivos
+    const multiDeviceAccounts=Object.entries(accountToDevices)
+      .filter(([,v])=>v.size>1)
+      .map(([account,devices])=>({account,devices:[...devices],count:devices.size}))
+      .sort((a,b)=>b.count-a.count);
+
+    return{suspiciousDevices,suspiciousIPs,sharedFPs,multiDeviceAccounts,totalRows:allRows.length,totalDevices:Object.keys(deviceToAccounts).length,totalAccounts:Object.keys(accountToDevices).length};
+  };
+
   const processUpload=async()=>{
-    if(!file||!entity){showToast('Falta archivo o entidad','err');return;}
+    if(!file){showToast('Falta archivo','err');return;}
+    if(fileType==='device'){
+      setUploading(true);
+      setTimeout(()=>{
+        const r=analyzeDevices();
+        setResult({type:'device',...r});
+        setUploading(false);
+        showToast(`✅ ${r.suspiciousDevices.length} dispositivos sospechosos detectados`,'ok');
+      },400);
+      return;
+    }
+    // Transaccional — enviar al backend
+    if(!entity){showToast('Falta entidad','err');return;}
     setUploading(true);setResult(null);
     try{
       const token=getToken();
-      const fd=new FormData();
-      fd.append('file',file);
-      fd.append('mapping',JSON.stringify(mapping));
+      const fd=new FormData();fd.append('file',file);fd.append('mapping',JSON.stringify(mapping));
       const r=await fetch(API_BASE+'/api/v2/auth/upload',{method:'POST',headers:{'Authorization':'Bearer '+token},body:fd});
       const d=await r.json();
       if(!r.ok){showToast(d.detail||'Error procesando','err');setUploading(false);return;}
-      setResult(d);
-      if(d.saved>0)showToast(`✅ ${d.saved} transacciones procesadas y scoreadas`,'ok');
+      setResult({type:'transactional',...d});
+      if(d.saved>0)showToast('✅ '+d.saved+' transacciones procesadas','ok');
       else showToast('No se procesó ninguna fila válida','err');
     }catch(e){showToast('Error: '+e.message,'err');}
     setUploading(false);
   };
 
+  const riskColor=(l)=>l==='CRÍTICO'?'var(--red)':l==='ALTO'?'var(--amber)':'var(--orange)';
   const decColor=(d)=>{if(d==='BLOQUEADA')return'var(--red)';if(d==='REVISIÓN')return'var(--amber)';if(d==='ALERTA')return'var(--orange)';return'var(--teal)';};
-  const mappingComplete=REQUIRED_FIELDS.every(f=>mapping[f]);
-  const fieldsMapped=Object.keys(mapping).length;
+  const isDevice=fileType==='device';
+  const currentFields=isDevice?DEV_FIELDS:TX_ALL;
+  const currentDesc=isDevice?DEV_DESC:TX_DESC;
+  const currentRequired=isDevice?['device_id','identity']:TX_REQUIRED;
+  const mappingComplete=currentRequired.every(f=>mapping[f]);
 
   return(
     <div>
       <div className="page-title">📤 Carga Masiva con IA</div>
-      <div className="page-sub">Sube cualquier Excel — la IA detecta las columnas automáticamente</div>
-      {!entity&&<div style={{background:'rgba(245,158,11,.1)',border:'1px solid rgba(245,158,11,.3)',borderRadius:8,padding:'12px 16px',marginBottom:16,fontSize:11,color:'var(--amber)'}}>⚠ Necesitas tener una entidad asignada para cargar transacciones</div>}
+      <div className="page-sub">Sube cualquier Excel — la IA detecta el tipo de datos y las columnas automáticamente</div>
+      {!entity&&fileType!=='device'&&<div style={{background:'rgba(245,158,11,.1)',border:'1px solid rgba(245,158,11,.3)',borderRadius:8,padding:'12px 16px',marginBottom:16,fontSize:11,color:'var(--amber)'}}>⚠ Para análisis transaccional necesitas entidad asignada. Los archivos de dispositivos se analizan localmente sin necesidad de entidad.</div>}
 
-      {/* PASO 1: SUBIR */}
+      {/* PASO 1 */}
       {!file&&(
         <div className="card">
           <div className="card-title">Arrastra tu archivo Excel o haz clic para seleccionarlo</div>
@@ -487,48 +575,57 @@ Si no encuentras una columna adecuada para un campo, usa null.`;
             onMouseEnter={e=>e.currentTarget.style.borderColor='var(--teal)'} onMouseLeave={e=>e.currentTarget.style.borderColor='var(--border2)'}>
             <div style={{fontSize:48,marginBottom:12}}>📂</div>
             <div style={{fontSize:13,color:'var(--light)',fontWeight:600,marginBottom:6}}>Cualquier archivo Excel (.xlsx)</div>
-            <div style={{fontSize:10,color:'var(--slate)'}}>Columnas en cualquier idioma, cualquier orden — la IA lo detecta</div>
-            <div style={{marginTop:12,fontSize:9,color:'var(--border2)'}}>Formatos aceptados: .xlsx · .xls</div>
+            <div style={{fontSize:10,color:'var(--slate)'}}>La IA detecta automáticamente si es transaccional o de dispositivos</div>
             <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{display:'none'}} onChange={e=>{const f=e.target.files[0];if(f)readFile(f);}}/>
           </div>
           <div style={{marginTop:16,display:'flex',gap:8,flexWrap:'wrap'}}>
-            <div style={{padding:'8px 12px',background:'var(--bg3)',borderRadius:6,fontSize:9,color:'var(--slate)',border:'1px solid var(--border)'}}>✓ Columnas en español, inglés o cualquier idioma</div>
-            <div style={{padding:'8px 12px',background:'var(--bg3)',borderRadius:6,fontSize:9,color:'var(--slate)',border:'1px solid var(--border)'}}>✓ Cualquier orden de columnas</div>
-            <div style={{padding:'8px 12px',background:'var(--bg3)',borderRadius:6,fontSize:9,color:'var(--slate)',border:'1px solid var(--border)'}}>✓ Columnas extra son ignoradas</div>
-            <div style={{padding:'8px 12px',background:'var(--bg3)',borderRadius:6,fontSize:9,color:'var(--slate)',border:'1px solid var(--border)'}}>✓ Mínimo: monto + canal + titular + cuenta</div>
+            {[['💳 Transaccional','montos, canales, titulares → score de fraude'],['📱 Dispositivos/Sesiones','device_id, IPs, fingerprints → dispositivos comprometidos'],['🌐 Cualquier idioma','columnas en español, inglés u otro'],['🤖 Auto-detección','la IA clasifica el archivo y mapea las columnas']].map(([t,d])=>(
+              <div key={t} style={{padding:'8px 12px',background:'var(--bg3)',borderRadius:6,fontSize:9,color:'var(--slate)',border:'1px solid var(--border)',flex:'1 1 180px'}}>
+                <div style={{color:'var(--light)',marginBottom:2}}>{t}</div>{d}
+              </div>
+            ))}
           </div>
         </div>
       )}
 
-      {/* PASO 2: MAPEO IA */}
+      {/* PASO 2: MAPEO */}
       {file&&!mappingConfirmed&&(
         <div>
           <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14}}>
-            <div style={{background:'var(--bg2)',border:'1px solid var(--teal)',borderRadius:8,padding:'10px 16px',flex:1,display:'flex',alignItems:'center',gap:10}}>
-              <div style={{fontSize:20}}>📄</div>
-              <div><div style={{fontSize:11,color:'var(--white)',fontWeight:600}}>{file.name}</div><div style={{fontSize:9,color:'var(--slate)'}}>{(file.size/1024).toFixed(1)} KB</div></div>
-              {aiAnalyzing&&<div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:6,fontSize:10,color:'var(--teal)'}}><Spinner/>IA detectando columnas...</div>}
-              {!aiAnalyzing&&<div style={{marginLeft:'auto',fontSize:9,color:'var(--teal)'}}>✓ {fieldsMapped} columnas detectadas</div>}
+            <div style={{background:'var(--bg2)',border:`1px solid ${isDevice?'var(--purple)':'var(--teal)'}`,borderRadius:8,padding:'10px 16px',flex:1,display:'flex',alignItems:'center',gap:12}}>
+              <div style={{fontSize:20}}>{isDevice?'📱':'💳'}</div>
+              <div>
+                <div style={{fontSize:11,color:'var(--white)',fontWeight:600}}>{file.name}</div>
+                {fileType&&<div style={{marginTop:3}}>
+                  <span style={{fontSize:8,padding:'2px 8px',borderRadius:3,background:isDevice?'rgba(168,85,247,.2)':'rgba(20,184,166,.15)',color:isDevice?'var(--purple)':'var(--teal)',border:`1px solid ${isDevice?'rgba(168,85,247,.3)':'rgba(20,184,166,.3)'}`}}>
+                    {isDevice?'📱 ANÁLISIS DE DISPOSITIVOS':'💳 ANÁLISIS TRANSACCIONAL'}
+                  </span>
+                </div>}
+              </div>
+              {aiAnalyzing&&<div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:6,fontSize:10,color:'var(--teal)'}}><Spinner/>IA analizando...</div>}
+              {!aiAnalyzing&&fileType&&<div style={{marginLeft:'auto',fontSize:9,color:'var(--teal)'}}>✓ {Object.keys(mapping).length} columnas detectadas</div>}
             </div>
-            <button className="btn btn-ghost" onClick={()=>{setFile(null);setRawData(null);setMapping({});fileRef.current&&(fileRef.current.value='');}} style={{whiteSpace:'nowrap'}}>✕ Cambiar</button>
+            <button className="btn btn-ghost" onClick={()=>{setFile(null);setRawData(null);setMapping({});setFileType(null);fileRef.current&&(fileRef.current.value='');}} style={{whiteSpace:'nowrap'}}>✕ Cambiar</button>
           </div>
 
-          {aiAnalyzing?<div className="center" style={{height:120}}><Spinner/>La IA está analizando las columnas de tu archivo...</div>:(
+          {aiAnalyzing?<div className="center" style={{height:120}}><Spinner/>La IA está clasificando el archivo y detectando columnas...</div>:(
             <>
+              {isDevice&&<div style={{background:'rgba(168,85,247,.08)',border:'1px solid rgba(168,85,247,.2)',borderRadius:8,padding:'10px 14px',marginBottom:12,fontSize:10,color:'var(--purple)'}}>
+                📱 <strong>Modo Dispositivos:</strong> Se detectarán dispositivos compartidos entre múltiples cuentas, IPs sospechosas, fingerprints duplicados y cuentas con múltiples dispositivos. El análisis se hace localmente sin enviar al backend.
+              </div>}
               <div className="card" style={{marginBottom:12}}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
-                  <div><div className="card-title" style={{marginBottom:2}}>Mapeo de columnas detectado por IA</div><div style={{fontSize:9,color:'var(--slate)'}}>Revisa y ajusta si es necesario</div></div>
-                  <div style={{display:'flex',gap:4}}>{REQUIRED_FIELDS.every(f=>mapping[f])?<span style={{fontSize:9,color:'var(--teal)'}}>✓ Listo para procesar</span>:<span style={{fontSize:9,color:'var(--amber)'}}>⚠ Faltan campos requeridos</span>}</div>
+                  <div><div className="card-title" style={{marginBottom:2}}>Mapeo de columnas detectado por IA</div><div style={{fontSize:9,color:'var(--slate)'}}>Revisa y ajusta si es necesario · Solo se requieren los campos marcados *</div></div>
+                  <span style={{fontSize:9,color:mappingComplete?'var(--teal)':'var(--amber)'}}>{mappingComplete?'✓ Listo':'⚠ Faltan campos *'}</span>
                 </div>
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-                  {ALL_FIELDS.map(field=>{
-                    const req=REQUIRED_FIELDS.includes(field);
+                  {currentFields.map(field=>{
+                    const req=currentRequired.includes(field);
                     return(
                       <div key={field} style={{background:'var(--bg3)',borderRadius:6,padding:'8px 10px',border:`1px solid ${mapping[field]?'rgba(20,184,166,.2)':req?'rgba(255,59,92,.2)':'var(--border)'}`}}>
-                        <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}><span style={{fontSize:8,color:req?'var(--amber)':'var(--slate)',letterSpacing:'.08em'}}>{field.toUpperCase()}{req&&' *'}</span>{mapping[field]&&<span style={{fontSize:8,color:'var(--teal)'}}>✓</span>}</div>
-                        <div style={{fontSize:8,color:'var(--border2)',marginBottom:5}}>{FIELD_DESCRIPTIONS[field]}</div>
-                        <select value={mapping[field]||''} onChange={e=>setMapping(m=>({...m,[field]:e.target.value||undefined}))}
-                          style={{width:'100%',padding:'4px 6px',fontSize:9}}>
+                        <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}><span style={{fontSize:8,color:req?'var(--amber)':'var(--slate)',letterSpacing:'.08em'}}>{field.toUpperCase()}{req?' *':''}</span>{mapping[field]&&<span style={{fontSize:8,color:'var(--teal)'}}>✓</span>}</div>
+                        <div style={{fontSize:8,color:'var(--border2)',marginBottom:5}}>{currentDesc[field]||''}</div>
+                        <select value={mapping[field]||''} onChange={e=>setMapping(m=>({...m,[field]:e.target.value||undefined}))} style={{width:'100%',padding:'4px 6px',fontSize:9}}>
                           <option value="">-- sin mapear --</option>
                           {headers.map(h=><option key={h} value={h}>{h}</option>)}
                         </select>
@@ -538,41 +635,117 @@ Si no encuentras una columna adecuada para un campo, usa null.`;
                 </div>
               </div>
 
-              {/* Preview datos */}
               {rawData&&<div className="card" style={{marginBottom:12}}>
-                <div className="card-title">Vista previa del archivo (primeras 5 filas)</div>
+                <div className="card-title">Vista previa (primeras 5 filas)</div>
                 <div style={{overflowX:'auto',marginTop:8}}>
                   <table className="tbl"><thead><tr>{headers.map(h=><th key={h}>{h}</th>)}</tr></thead>
-                  <tbody>{rawData.map((row,i)=><tr key={i}>{headers.map((_,j)=><td key={j} style={{fontSize:9,maxWidth:120,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{String(row[j]||'—')}</td>)}</tr>)}</tbody></table>
+                  <tbody>{rawData.map((row,i)=><tr key={i}>{headers.map((_,j)=><td key={j} style={{fontSize:9,maxWidth:100,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{String(row[j]||'—')}</td>)}</tr>)}</tbody></table>
                 </div>
               </div>}
 
-              <button className="btn btn-red" style={{width:'100%',padding:'12px'}} disabled={!mappingComplete||!entity} onClick={()=>setMappingConfirmed(true)}>
-                {mappingComplete?'✓ Confirmar mapeo y procesar →':'Completa los campos requeridos primero (*)'}
+              <button className={`btn ${isDevice?'btn-purple':'btn-red'}`} style={{width:'100%',padding:'12px'}} disabled={!mappingComplete} onClick={()=>setMappingConfirmed(true)}>
+                {mappingComplete?(isDevice?'🔍 Analizar dispositivos →':'💳 Confirmar y procesar →'):'Completa los campos requeridos (*)'}
               </button>
             </>
           )}
         </div>
       )}
 
-      {/* PASO 3: PROCESAR */}
+      {/* PASO 3: CONFIRMAR */}
       {file&&mappingConfirmed&&!result&&(
         <div className="card" style={{textAlign:'center',padding:'40px'}}>
-          <div style={{fontSize:40,marginBottom:16}}>⚡</div>
-          <div style={{fontFamily:'var(--sans)',fontSize:16,fontWeight:700,color:'var(--white)',marginBottom:8}}>Listo para scorear</div>
-          <div style={{fontSize:10,color:'var(--slate)',marginBottom:24}}>Se va a procesar <strong style={{color:'var(--white)'}}>{file.name}</strong> con el mapeo confirmado</div>
-          <div style={{display:'flex',gap:8,justifyContent:'center',flexWrap:'wrap',marginBottom:24}}>
-            {Object.entries(mapping).map(([k,v])=><div key={k} style={{background:'var(--bg3)',borderRadius:4,padding:'4px 10px',fontSize:9}}><span style={{color:'var(--teal)'}}>{k}</span><span style={{color:'var(--slate)'}}> → </span><span style={{color:'var(--light)'}}>{v}</span></div>)}
-          </div>
+          <div style={{fontSize:40,marginBottom:16}}>{isDevice?'🔍':'⚡'}</div>
+          <div style={{fontFamily:'var(--sans)',fontSize:16,fontWeight:700,color:'var(--white)',marginBottom:8}}>{isDevice?'Listo para analizar dispositivos':'Listo para scorear'}</div>
+          <div style={{fontSize:10,color:'var(--slate)',marginBottom:24}}>{file.name} · {allRows.length} filas</div>
           <div style={{display:'flex',gap:10,justifyContent:'center'}}>
-            <button className="btn btn-red" style={{padding:'12px 32px',fontSize:12}} disabled={uploading} onClick={processUpload}>{uploading?<><Spinner/>Procesando y scoreando...</>:'⚡ Procesar ahora →'}</button>
-            <button className="btn btn-ghost" onClick={()=>setMappingConfirmed(false)}>← Cambiar mapeo</button>
+            <button className={`btn ${isDevice?'btn-purple':'btn-red'}`} style={{padding:'12px 32px',fontSize:12}} disabled={uploading} onClick={processUpload}>
+              {uploading?<><Spinner/>{isDevice?'Analizando...':'Procesando...'}</>:(isDevice?'🔍 Detectar dispositivos comprometidos →':'⚡ Procesar y scorear →')}
+            </button>
+            <button className="btn btn-ghost" onClick={()=>setMappingConfirmed(false)}>← Ajustar mapeo</button>
           </div>
         </div>
       )}
 
-      {/* RESULTADOS */}
-      {result&&(
+      {/* RESULTADOS DISPOSITIVOS */}
+      {result&&result.type==='device'&&(()=>{
+        const{suspiciousDevices,suspiciousIPs,sharedFPs,multiDeviceAccounts,totalRows,totalDevices,totalAccounts}=result;
+        return(
+          <div>
+            <div className="grid-4" style={{marginBottom:14}}>
+              {[['Sesiones analizadas',totalRows,'var(--muted)'],['Dispositivos únicos',totalDevices,'var(--light)'],['Cuentas únicas',totalAccounts,'var(--light)'],['Dispositivos comprometidos',suspiciousDevices.length,'var(--red)']].map(([l,v,c])=>(
+                <div className="card" key={l}><div className="card-title">{l}</div><div style={{fontFamily:'var(--sans)',fontSize:24,fontWeight:800,color:c}}>{v}</div></div>
+              ))}
+            </div>
+            <div className="grid-3" style={{marginBottom:14}}>
+              <div className="card"><div className="card-title">IPs sospechosas</div><div style={{fontFamily:'var(--sans)',fontSize:28,fontWeight:800,color:'var(--amber)'}}>{suspiciousIPs.length}</div><div style={{fontSize:9,color:'var(--slate)',marginTop:2}}>IPs compartidas entre múltiples cuentas</div></div>
+              <div className="card"><div className="card-title">Fingerprints duplicados</div><div style={{fontFamily:'var(--sans)',fontSize:28,fontWeight:800,color:'var(--orange)'}}>{sharedFPs.length}</div><div style={{fontSize:9,color:'var(--slate)',marginTop:2}}>Mismo device en distintas cuentas</div></div>
+              <div className="card"><div className="card-title">Cuentas multi-device</div><div style={{fontFamily:'var(--sans)',fontSize:28,fontWeight:800,color:'var(--purple)'}}>{multiDeviceAccounts.length}</div><div style={{fontSize:9,color:'var(--slate)',marginTop:2}}>Cuentas accedidas desde varios devices</div></div>
+            </div>
+
+            {suspiciousDevices.length>0&&<>
+              <div className="sec" style={{color:'var(--red)'}}>🚨 Dispositivos comprometidos ({suspiciousDevices.length})</div>
+              <div style={{marginBottom:14}}>
+                {suspiciousDevices.map((d,i)=>(
+                  <div key={i} style={{background:'var(--bg2)',border:`1px solid ${riskColor(d.level)}40`,borderLeft:`3px solid ${riskColor(d.level)}`,borderRadius:8,padding:'12px 14px',marginBottom:8}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:8}}>
+                      <div>
+                        <div style={{fontFamily:'var(--mono)',fontSize:10,color:'var(--white)',marginBottom:2}}>📱 {d.device}</div>
+                        <div style={{fontSize:9,color:'var(--slate)'}}>{d.os||''} {d.browser?'· '+d.browser:''} {d.bank?'· '+d.bank:''}</div>
+                      </div>
+                      <div style={{textAlign:'right'}}>
+                        <div style={{fontFamily:'var(--sans)',fontSize:20,fontWeight:800,color:riskColor(d.level)}}>{d.risk}</div>
+                        <span style={{fontSize:8,padding:'2px 7px',borderRadius:3,border:`1px solid ${riskColor(d.level)}50`,color:riskColor(d.level),background:riskColor(d.level)+'15'}}>{d.level}</span>
+                      </div>
+                    </div>
+                    <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                      <div style={{flex:1,minWidth:160}}>
+                        <div style={{fontSize:8,color:'var(--slate)',marginBottom:4}}>CUENTAS AFECTADAS ({d.accounts.length})</div>
+                        {d.accounts.map((a,j)=><div key={j} style={{fontSize:9,padding:'2px 6px',background:'rgba(255,59,92,.1)',borderRadius:3,marginBottom:2,color:'var(--light)',fontFamily:'var(--mono)'}}>{a.slice(0,32)}{a.length>32?'…':''}</div>)}
+                      </div>
+                      <div style={{flex:1,minWidth:160}}>
+                        <div style={{fontSize:8,color:'var(--slate)',marginBottom:4}}>IPs VISTAS ({d.ips.length})</div>
+                        {d.ips.slice(0,4).map((ip,j)=><div key={j} style={{fontSize:9,padding:'2px 6px',background:'rgba(245,158,11,.1)',borderRadius:3,marginBottom:2,color:'var(--amber)'}}>{ip}</div>)}
+                        {d.ips.length>4&&<div style={{fontSize:8,color:'var(--slate)'}}>+{d.ips.length-4} más</div>}
+                      </div>
+                    </div>
+                    <div style={{marginTop:6,fontSize:8,color:'var(--slate)'}}>Sesiones: {d.sessions} · Fingerprints: {d.fingerprints.length}</div>
+                  </div>
+                ))}
+              </div>
+            </>}
+
+            {suspiciousIPs.length>0&&<>
+              <div className="sec" style={{color:'var(--amber)'}}>🌐 IPs compartidas entre múltiples cuentas (top 20)</div>
+              <div className="card" style={{marginBottom:14}}>
+                <table className="tbl"><thead><tr><th>IP</th><th>Cuentas</th><th>Riesgo</th></tr></thead>
+                <tbody>{suspiciousIPs.slice(0,20).map((ip,i)=>(
+                  <tr key={i}><td style={{fontFamily:'var(--mono)',color:'var(--amber)'}}>{ip.ip}</td>
+                  <td><div style={{display:'flex',gap:4,flexWrap:'wrap'}}>{ip.accounts.slice(0,3).map((a,j)=><span key={j} style={{fontSize:8,padding:'1px 5px',background:'rgba(245,158,11,.1)',borderRadius:3}}>{a.slice(0,16)}{a.length>16?'…':''}</span>)}{ip.accounts.length>3&&<span style={{fontSize:8,color:'var(--slate)'}}>+{ip.accounts.length-3}</span>}</div></td>
+                  <td><span style={{fontFamily:'var(--sans)',fontWeight:700,color:ip.count>=4?'var(--red)':ip.count>=2?'var(--amber)':'var(--orange)'}}>{ip.count} cuentas</span></td></tr>
+                ))}</tbody></table>
+              </div>
+            </>}
+
+            {multiDeviceAccounts.length>0&&<>
+              <div className="sec" style={{color:'var(--purple)'}}>📲 Cuentas accedidas desde múltiples dispositivos</div>
+              <div className="card" style={{marginBottom:14}}>
+                <table className="tbl"><thead><tr><th>Cuenta</th><th>Dispositivos</th></tr></thead>
+                <tbody>{multiDeviceAccounts.slice(0,15).map((a,i)=>(
+                  <tr key={i}><td style={{fontFamily:'var(--mono)',color:'var(--light)'}}>{a.account.slice(0,32)}</td>
+                  <td><span style={{fontFamily:'var(--sans)',fontWeight:700,color:'var(--purple)'}}>{a.count}</span> <span style={{fontSize:8,color:'var(--slate)'}}>dispositivos</span></td></tr>
+                ))}</tbody></table>
+              </div>
+            </>}
+
+            <div style={{display:'flex',gap:8}}>
+              <button className="btn btn-ghost" onClick={()=>{setFile(null);setResult(null);setMapping({});setMappingConfirmed(false);setFileType(null);setAllRows([]);fileRef.current&&(fileRef.current.value='');}}>+ Analizar otro archivo</button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* RESULTADOS TRANSACCIONALES */}
+      {result&&result.type==='transactional'&&(
         <div>
           <div className="grid-3" style={{marginBottom:12}}>
             {[['Total filas',result.total,'var(--muted)'],['Procesadas',result.saved,'var(--teal)'],['Con error',result.errors,result.errors>0?'var(--red)':'var(--slate)']].map(([l,v,c])=>(
@@ -583,10 +756,10 @@ Si no encuentras una columna adecuada para un campo, usa null.`;
             const counts=result.scored.reduce((a,t)=>({...a,[t.decision]:(a[t.decision]||0)+1}),{});
             return(<div className="card" style={{marginBottom:12}}><div className="card-title">Distribución de decisiones</div><div style={{display:'flex',gap:8,marginTop:8,flexWrap:'wrap'}}>{Object.entries(counts).map(([d,n])=><div key={d} style={{background:'var(--bg3)',borderRadius:6,padding:'8px 14px',textAlign:'center'}}><div style={{fontFamily:'var(--sans)',fontSize:20,fontWeight:800,color:decColor(d)}}>{n}</div><div style={{fontSize:8,color:'var(--slate)',marginTop:2}}>{d}</div></div>)}</div></div>);
           })()}
-          {result.error_detail?.length>0&&<div className="card" style={{marginBottom:12,border:'1px solid rgba(255,59,92,.2)'}}><div className="card-title" style={{color:'var(--red)'}}>Filas con error ({result.error_detail.length})</div>{result.error_detail.map((e,i)=><div key={i} style={{padding:'5px 0',borderBottom:'1px solid var(--border)',fontSize:9}}><span style={{color:'var(--slate)'}}>Fila {e.row} · </span><span style={{color:'var(--light)'}}>{e.tx_id}</span><span style={{color:'var(--red)',marginLeft:8}}>{e.errors?.join(', ')}</span></div>)}</div>}
-          {result.scored?.length>0&&<div className="card"><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}><div className="card-title" style={{margin:0}}>Preview resultados</div><button className="btn btn-ghost" style={{padding:'4px 10px',fontSize:8}} onClick={()=>{setFile(null);setResult(null);setMapping({});setMappingConfirmed(false);fileRef.current&&(fileRef.current.value='');}}>+ Cargar otro archivo</button></div>
+          {result.error_detail?.length>0&&<div className="card" style={{marginBottom:12,border:'1px solid rgba(255,59,92,.2)'}}><div className="card-title" style={{color:'var(--red)'}}>Filas con error ({result.error_detail.length})</div>{result.error_detail.map((e,i)=><div key={i} style={{padding:'5px 0',borderBottom:'1px solid var(--border)',fontSize:9}}><span style={{color:'var(--slate)'}}>Fila {e.row} · </span><span style={{color:'var(--red)',marginLeft:8}}>{e.errors?.join(', ')}</span></div>)}</div>}
+          {result.scored?.length>0&&<div className="card"><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}><div className="card-title" style={{margin:0}}>Resultados</div><button className="btn btn-ghost" style={{padding:'4px 10px',fontSize:8}} onClick={()=>{setFile(null);setResult(null);setMapping({});setMappingConfirmed(false);setFileType(null);setAllRows([]);fileRef.current&&(fileRef.current.value='');}}>+ Otro archivo</button></div>
             <div style={{maxHeight:360,overflowY:'auto'}}><table className="tbl"><thead><tr><th>TX ID</th><th>Monto</th><th>Canal</th><th>Score</th><th>Decisión</th><th>Riesgo</th></tr></thead><tbody>{result.scored.slice(0,100).map(t=><tr key={t.tx_id}><td className="mono">{t.tx_id}</td><td>{fmtAmt(t.amount)}</td><td><span className={`badge ${t.risk}`}>{t.channel}</span></td><td style={{fontFamily:'var(--sans)',fontWeight:700,color:scoreColor(t.score)}}>{t.score}</td><td><span className={`badge ${t.decision}`}>{t.decision}</span></td><td><span className={`badge ${t.risk}`}>{t.risk}</span></td></tr>)}</tbody></table></div>
-            <div style={{marginTop:8,fontSize:9,color:'var(--teal)'}}>✅ Todas las transacciones ya están en el Dashboard y Alertas</div>
+            <div style={{marginTop:8,fontSize:9,color:'var(--teal)'}}>✅ Transacciones en Dashboard y Alertas</div>
           </div>}
         </div>
       )}
