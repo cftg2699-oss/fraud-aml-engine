@@ -8,6 +8,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -168,6 +169,40 @@ input:focus,select:focus,textarea:focus{border-color:var(--teal)}
 .fb-fp.sel,.fb-fp:hover{background:rgba(20,184,166,.25);border-color:var(--teal)}
 .fb-review{border-color:rgba(59,130,246,.3);color:var(--blue);background:var(--blue3)}
 .fb-review.sel,.fb-review:hover{background:rgba(59,130,246,.25);border-color:var(--blue)}
+
+/* ── CHANNEL BAR ─────────────────────────────── */
+.ch-bar{display:flex;align-items:center;gap:6px;padding:0 16px 0 8px}
+.ch-btn{padding:3px 10px;border-radius:4px;border:1px solid;font-size:9px;font-weight:600;
+  letter-spacing:.07em;cursor:pointer;font-family:var(--mono);transition:all .15s;white-space:nowrap}
+.ch-btn-all{border-color:var(--border2);color:var(--slate);background:transparent}
+.ch-btn-all.sel{border-color:var(--teal);color:var(--teal);background:rgba(20,184,166,.1)}
+.ch-btn-card{border-color:rgba(59,130,246,.3);color:var(--blue);background:transparent}
+.ch-btn-card.sel{background:var(--blue3)}
+.ch-btn-transfer{border-color:rgba(168,85,247,.3);color:var(--purple);background:transparent}
+.ch-btn-transfer.sel{background:var(--purple3)}
+.ch-btn-wallet{border-color:rgba(20,184,166,.3);color:var(--teal);background:transparent}
+.ch-btn-wallet.sel{background:var(--teal3)}
+.ch-btn-atm{border-color:rgba(245,158,11,.3);color:var(--amber);background:transparent}
+.ch-btn-atm.sel{background:var(--amber3)}
+.ch-btn-digital{border-color:rgba(249,115,22,.3);color:var(--orange);background:transparent}
+.ch-btn-digital.sel{background:rgba(249,115,22,.1)}
+
+/* ── NETWORK ─────────────────────────────────── */
+.net-canvas{width:100%;height:calc(100vh - 180px);background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);overflow:hidden;position:relative}
+.net-tooltip{position:absolute;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:8px 12px;font-size:9px;pointer-events:none;z-index:100;max-width:220px;color:var(--light)}
+.net-legend{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.net-legend-item{display:flex;align-items:center;gap:5px;font-size:9px;color:var(--slate)}
+.net-legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+
+/* ── RULES EDITOR ────────────────────────────── */
+.rule-row{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.04);transition:background .1s}
+.rule-row:hover{background:var(--bg3)}
+.rule-toggle{width:32px;height:18px;border-radius:9px;border:none;cursor:pointer;position:relative;transition:background .2s;flex-shrink:0}
+.rule-toggle-on{background:var(--teal)}
+.rule-toggle-off{background:var(--border2)}
+.rule-toggle::after{content:'';position:absolute;top:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:left .2s}
+.rule-toggle-on::after{left:16px}
+.rule-toggle-off::after{left:2px}
 </style>
 </head>
 <body>
@@ -250,20 +285,21 @@ function Toast({msg, type}) {
 /* ══════════════════════════════════════════
    PAGE: DASHBOARD
 ══════════════════════════════════════════ */
-function Dashboard({entity, toast}) {
+function Dashboard({entity, channel, toast}) {
   const [stats, setStats]   = useState(null);
   const [feed,  setFeed]    = useState([]);
   const [loading, setLoad]  = useState(true);
 
   const load = useCallback(async () => {
     try {
+      const chQ=channel&&channel!=='ALL'?'&channel='+channel:'';
       const [s, f] = await Promise.all([
-        api(`/api/v2/stats${entity ? `?entity_code=${entity}` : ''}`),
-        api(`/api/v2/feed?limit=30${entity ? `&entity_code=${entity}` : ''}`),
+        api('/api/v2/stats?'+(entity?'entity_code='+entity:'')+chQ),
+        api('/api/v2/feed?limit=30'+(entity?'&entity_code='+entity:'')+chQ),
       ]);
       setStats(s); setFeed(f.data); setLoad(false);
     } catch(e) { setLoad(false); }
-  }, [entity]);
+  }, [entity, channel]);
 
   useEffect(() => { load(); const t = setInterval(load, 5000); return ()=>clearInterval(t); }, [load]);
 
@@ -405,7 +441,7 @@ function Dashboard({entity, toast}) {
 /* ══════════════════════════════════════════
    PAGE: ALERTAS
 ══════════════════════════════════════════ */
-function Alerts({entity, showToast}) {
+function Alerts({entity, channel, showToast}) {
   const [alerts,   setAlerts]   = useState([]);
   const [selected, setSel]      = useState(null);
   const [detail,   setDetail]   = useState(null);
@@ -418,10 +454,11 @@ function Alerts({entity, showToast}) {
 
   const loadAlerts = useCallback(async () => {
     try {
-      const d = await api(`/api/v2/alerts?status=${filter}&limit=100${entity?`&entity_code=${entity}`:''}`);
+      const chA=channel&&channel!=='ALL'?'&channel='+channel:'';
+      const d = await api('/api/v2/alerts?status='+filter+'&limit=100'+(entity?'&entity_code='+entity:'')+chA);
       setAlerts(d.data); setLoad(false);
     } catch(e) { setLoad(false); }
-  }, [filter, entity]);
+  }, [filter, entity, channel]);
 
   useEffect(() => { setLoad(true); loadAlerts(); }, [loadAlerts]);
 
@@ -728,7 +765,7 @@ function Alerts({entity, showToast}) {
 /* ══════════════════════════════════════════
    PAGE: PERFILES
 ══════════════════════════════════════════ */
-function Profiles({entity, showToast}) {
+function Profiles({entity, channel, showToast}) {
   const [profiles, setProfiles] = useState([]);
   const [total, setTotal]       = useState(0);
   const [loading, setLoad]      = useState(true);
@@ -739,10 +776,11 @@ function Profiles({entity, showToast}) {
 
   const load = useCallback(async () => {
     try {
-      const d = await api(`/api/v2/profiles?limit=50${entity?`&entity_code=${entity}`:''}${riskFilter?`&risk_label=${riskFilter}`:''}`);
+      const chP=channel&&channel!=='ALL'?'&channel='+channel:'';
+      const d = await api('/api/v2/profiles?limit=50'+(entity?'&entity_code='+entity:'')+chP+(riskFilter?'&risk_label='+riskFilter:''));
       setProfiles(d.profiles); setTotal(d.total); setLoad(false);
     } catch(e) { setLoad(false); }
-  }, [entity, riskFilter]);
+  }, [entity, channel, riskFilter]);
 
   useEffect(() => { setLoad(true); load(); }, [load]);
 
@@ -2110,6 +2148,561 @@ function OtherAlerts({alerts, setAlerts, showToast}) {
 }
 
 
+/* ══════════════════════════════════════════
+   PAGE: RED DE RIESGO (Network Graph)
+══════════════════════════════════════════ */
+/* ══════════════════════════════════════════
+   PAGE: EDITOR DE REGLAS
+══════════════════════════════════════════ */
+
+const DEFAULT_RULES = {
+  ALL: [
+    {id:'R01', name:'Monto alto (>5000)', description:'Transaccion de monto elevado', points:150, enabled:true, editable:true, field:'amount', op:'>',  threshold:5000},
+    {id:'R02', name:'Monto muy alto (>15000)', description:'Transaccion de monto muy elevado', points:250, enabled:true, editable:true, field:'amount', op:'>',  threshold:15000},
+    {id:'R03', name:'Velocidad 1h (>3 TX)', description:'Mas de 3 transacciones en 1 hora', points:200, enabled:true, editable:true, field:'tx_1h', op:'>',  threshold:3},
+    {id:'R04', name:'Velocidad 24h (>8 TX)', description:'Mas de 8 transacciones en 24 horas', points:150, enabled:true, editable:true, field:'tx_24h', op:'>',  threshold:8},
+    {id:'R05', name:'Multiples ciudades 24h (>1)', description:'Operaciones en mas de una ciudad en 24h', points:180, enabled:true, editable:true, field:'cities_24h', op:'>',  threshold:1},
+    {id:'R06', name:'Primera TX del perfil', description:'Cuenta sin historial previo', points:80, enabled:true, editable:false},
+    {id:'R07', name:'Horario nocturno (0-5h)', description:'Transaccion en madrugada', points:60, enabled:true, editable:false},
+    {id:'R08', name:'Perfil marcado como FRAUD', description:'Identidad con fraude confirmado previo', points:400, enabled:true, editable:false},
+    {id:'R09', name:'Score promedio historico alto', description:'Perfil con score historico > 700', points:120, enabled:true, editable:true, field:'score_avg', op:'>',  threshold:700},
+    {id:'R10', name:'Volumen 24h alto (>20000)', description:'Volumen total en 24h elevado', points:130, enabled:true, editable:true, field:'sum_24h', op:'>',  threshold:20000},
+  ],
+  CARD: [
+    {id:'RC01', name:'Tarjeta en lista negra', description:'Numero de tarjeta reportado como comprometido', points:500, enabled:true, editable:false},
+    {id:'RC02', name:'Compra internacional', description:'Transaccion en moneda o comercio extranjero', points:100, enabled:true, editable:true, field:'amount', op:'>',  threshold:200},
+    {id:'RC03', name:'Multiplos intentos fallidos', description:'Mas de 2 intentos rechazados previos', points:180, enabled:true, editable:true, field:'failed', op:'>',  threshold:2},
+    {id:'RC04', name:'Chip vs banda magnetica', description:'Uso de banda en lugar de chip', points:90, enabled:true, editable:false},
+  ],
+  TRANSFER: [
+    {id:'RT01', name:'Cuenta destino nueva', description:'Primera transferencia a este destino', points:120, enabled:true, editable:false},
+    {id:'RT02', name:'Monto redondo sospechoso', description:'Montos exactamente redondos (ej: 10000, 5000)', points:80, enabled:true, editable:false},
+    {id:'RT03', name:'Transferencia > limite diario', description:'Supera el limite diario configurado', points:200, enabled:true, editable:true, field:'amount', op:'>',  threshold:10000},
+    {id:'RT04', name:'Multiples beneficiarios 24h', description:'Mas de 3 destinos distintos en 24h', points:160, enabled:true, editable:true, field:'dest_count', op:'>',  threshold:3},
+  ],
+  WALLET: [
+    {id:'RW01', name:'Recarga y retiro inmediato', description:'Recarga seguida de retiro en < 1 hora', points:200, enabled:true, editable:false},
+    {id:'RW02', name:'Monto recarga alto', description:'Recarga > umbral configurado', points:130, enabled:true, editable:true, field:'amount', op:'>',  threshold:3000},
+    {id:'RW03', name:'Cambio de dispositivo reciente', description:'Cambio de dispositivo en ultimas 24h', points:150, enabled:true, editable:false},
+  ],
+  ATM: [
+    {id:'RA01', name:'Retiros multiples 1h (>2)', description:'Mas de 2 retiros en cajeros en 1 hora', points:200, enabled:true, editable:true, field:'tx_1h', op:'>',  threshold:2},
+    {id:'RA02', name:'Retiro maximo permitido', description:'Retiro igual al limite maximo del cajero', points:100, enabled:true, editable:false},
+    {id:'RA03', name:'Cajero en zona de alto riesgo', description:'Transaccion en ATM con historial de fraude', points:150, enabled:true, editable:false},
+    {id:'RA04', name:'Retiro nocturno alto', description:'Retiro nocturno > umbral', points:120, enabled:true, editable:true, field:'amount', op:'>',  threshold:500},
+  ],
+  DIGITAL_BANKING: [
+    {id:'RD01', name:'Login desde IP nueva', description:'Acceso desde IP no registrada en perfil', points:100, enabled:true, editable:false},
+    {id:'RD02', name:'Cambio de contrasena reciente', description:'Contrasena cambiada en ultimas 24h', points:120, enabled:true, editable:false},
+    {id:'RD03', name:'Transaccion post-cambio datos', description:'TX inmediata tras cambio de datos de contacto', points:200, enabled:true, editable:false},
+    {id:'RD04', name:'Monto alto digital', description:'Operacion digital > umbral', points:140, enabled:true, editable:true, field:'amount', op:'>',  threshold:8000},
+  ],
+};
+
+function RulesEditor({channel, showToast}) {
+  const storageKey = 'rules_config';
+  const [rules, setRules] = React.useState(() => {
+    try {
+      const saved = localStorage.getItem(storageKey);
+      return saved ? JSON.parse(saved) : JSON.parse(JSON.stringify(DEFAULT_RULES));
+    } catch(e) {
+      return JSON.parse(JSON.stringify(DEFAULT_RULES));
+    }
+  });
+  const [editingId, setEditingId] = React.useState(null);
+  const [editVals, setEditVals] = React.useState({});
+  const [saving, setSaving] = React.useState(false);
+
+  // Canal activo para mostrar reglas
+  const activeChannel = channel && channel !== 'ALL' ? channel : null;
+
+  // Reglas a mostrar: globales + las del canal activo
+  const displayRules = [
+    ...(rules.ALL || []).map(r => ({...r, scope: 'GLOBAL'})),
+    ...(activeChannel ? (rules[activeChannel] || []).map(r => ({...r, scope: activeChannel})) : []),
+  ];
+
+  const toggleRule = (scope, id) => {
+    setRules(prev => {
+      const next = JSON.parse(JSON.stringify(prev));
+      const rule = next[scope].find(r => r.id === id);
+      if (rule) rule.enabled = !rule.enabled;
+      localStorage.setItem(storageKey, JSON.stringify(next));
+      return next;
+    });
+    showToast('Regla actualizada', 'ok');
+  };
+
+  const startEdit = (rule) => {
+    setEditingId(rule.id);
+    setEditVals({points: rule.points, threshold: rule.threshold});
+  };
+
+  const saveEdit = (scope, id) => {
+    setSaving(true);
+    setRules(prev => {
+      const next = JSON.parse(JSON.stringify(prev));
+      const rule = next[scope].find(r => r.id === id);
+      if (rule) {
+        if (editVals.points !== undefined)   rule.points    = parseInt(editVals.points) || rule.points;
+        if (editVals.threshold !== undefined) rule.threshold = parseFloat(editVals.threshold) || rule.threshold;
+      }
+      localStorage.setItem(storageKey, JSON.stringify(next));
+      return next;
+    });
+    setEditingId(null);
+    setSaving(false);
+    showToast('Regla guardada', 'ok');
+  };
+
+  const resetAll = () => {
+    if (!confirm('Restaurar todas las reglas a valores por defecto?')) return;
+    const fresh = JSON.parse(JSON.stringify(DEFAULT_RULES));
+    setRules(fresh);
+    localStorage.setItem(storageKey, JSON.stringify(fresh));
+    showToast('Reglas restauradas', 'ok');
+  };
+
+  const totalEnabled = displayRules.filter(r => r.enabled).length;
+  const maxScore = displayRules.filter(r => r.enabled).reduce((s, r) => s + r.points, 0);
+
+  const scopeColor = s => s === 'GLOBAL' ? 'var(--teal)' : 'var(--blue)';
+  const scopeBg   = s => s === 'GLOBAL' ? 'rgba(20,184,166,.12)' : 'rgba(59,130,246,.12)';
+
+  return (
+    <div>
+      <div className="page-title">Editor de Reglas</div>
+      <div className="page-sub">
+        Reglas heurísticas de scoring — activas para{' '}
+        <span style={{color:'var(--teal)'}}>
+          {activeChannel ? activeChannel : 'TODOS LOS CANALES'}
+        </span>
+      </div>
+
+      {/* Stats */}
+      <div className="grid-4" style={{marginBottom:14}}>
+        {[
+          ['Reglas activas', totalEnabled, 'var(--teal)'],
+          ['Reglas totales', displayRules.length, 'var(--muted)'],
+          ['Score max posible', maxScore, maxScore > 800 ? 'var(--red)' : 'var(--amber)'],
+          ['Canal filtro', activeChannel || 'GLOBAL', 'var(--blue)'],
+        ].map(([l,v,c]) => (
+          <div className="card" key={l}>
+            <div className="card-title">{l}</div>
+            <div style={{fontFamily:'var(--sans)',fontSize:20,fontWeight:800,color:c}}>{v}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+        <div style={{fontSize:9,color:'var(--slate)'}}>
+          {activeChannel
+            ? 'Mostrando reglas globales + reglas específicas de ' + activeChannel
+            : 'Mostrando reglas globales. Selecciona un canal en el filtro superior para ver reglas específicas.'}
+        </div>
+        <button className="btn btn-ghost" style={{padding:'4px 12px',fontSize:9}} onClick={resetAll}>
+          ↺ Restaurar defaults
+        </button>
+      </div>
+
+      {/* Separador GLOBAL */}
+      <div className="sec">Reglas globales (todos los canales)</div>
+      {(rules.ALL||[]).map(rule => (
+        <RuleRow key={rule.id} rule={{...rule, scope:'ALL'}} editingId={editingId} editVals={editVals}
+          setEditVals={setEditVals} onToggle={()=>toggleRule('ALL',rule.id)}
+          onEdit={()=>startEdit(rule)} onSave={()=>saveEdit('ALL',rule.id)}
+          onCancel={()=>setEditingId(null)} saving={saving} scopeColor='var(--teal)' scopeLabel='GLOBAL'/>
+      ))}
+
+      {/* Separador por canal */}
+      {activeChannel && (<>
+        <div className="sec" style={{color:'var(--blue)'}}>Reglas específicas — {activeChannel}</div>
+        {(rules[activeChannel]||[]).map(rule => (
+          <RuleRow key={rule.id} rule={{...rule, scope:activeChannel}} editingId={editingId} editVals={editVals}
+            setEditVals={setEditVals} onToggle={()=>toggleRule(activeChannel,rule.id)}
+            onEdit={()=>startEdit(rule)} onSave={()=>saveEdit(activeChannel,rule.id)}
+            onCancel={()=>setEditingId(null)} saving={saving} scopeColor='var(--blue)' scopeLabel={activeChannel}/>
+        ))}
+      </>)}
+
+      {!activeChannel && (
+        <div style={{background:'rgba(59,130,246,.06)',border:'1px solid rgba(59,130,246,.2)',borderRadius:8,padding:'14px 16px',marginTop:12,fontSize:10,color:'var(--blue)'}}>
+          💡 Selecciona un canal en el filtro superior (CARD, TRANSFER, WALLET, ATM, DIGITAL_BANKING) para ver y editar las reglas específicas de ese canal.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RuleRow({rule, editingId, editVals, setEditVals, onToggle, onEdit, onSave, onCancel, saving, scopeColor, scopeLabel}) {
+  const isEditing = editingId === rule.id;
+  return (
+    <div className="rule-row" style={{background: rule.enabled ? 'transparent' : 'rgba(0,0,0,.2)', opacity: rule.enabled ? 1 : 0.5}}>
+      {/* Toggle */}
+      <button className={'rule-toggle ' + (rule.enabled ? 'rule-toggle-on' : 'rule-toggle-off')}
+        onClick={onToggle} title={rule.enabled ? 'Desactivar' : 'Activar'}/>
+
+      {/* ID + scope */}
+      <div style={{display:'flex',flexDirection:'column',gap:2,minWidth:52}}>
+        <span style={{fontSize:8,fontFamily:'var(--mono)',color:'var(--slate)'}}>{rule.id}</span>
+        <span style={{fontSize:7,padding:'1px 4px',borderRadius:2,background:scopeColor+'20',color:scopeColor,fontWeight:600}}>{scopeLabel}</span>
+      </div>
+
+      {/* Nombre + descripcion */}
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontSize:10,color: rule.enabled ? 'var(--white)' : 'var(--slate)',fontWeight:500,marginBottom:1}}>{rule.name}</div>
+        <div style={{fontSize:8,color:'var(--border2)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{rule.description}</div>
+      </div>
+
+      {/* Threshold (si editable y tiene threshold) */}
+      {rule.editable && rule.threshold !== undefined && (
+        <div style={{minWidth:80,textAlign:'right'}}>
+          {isEditing ? (
+            <input type="number" value={editVals.threshold ?? rule.threshold}
+              onChange={e=>setEditVals(v=>({...v,threshold:e.target.value}))}
+              style={{width:70,padding:'3px 6px',fontSize:9,textAlign:'right'}}/>
+          ) : (
+            <div style={{fontSize:9,color:'var(--slate)'}}>
+              {rule.op} <span style={{color:'var(--amber)',fontFamily:'var(--mono)'}}>{rule.threshold?.toLocaleString()}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Puntos */}
+      <div style={{minWidth:60,textAlign:'right'}}>
+        {isEditing ? (
+          <input type="number" min={0} max={999} value={editVals.points ?? rule.points}
+            onChange={e=>setEditVals(v=>({...v,points:e.target.value}))}
+            style={{width:55,padding:'3px 6px',fontSize:9,textAlign:'right'}}/>
+        ) : (
+          <div>
+            <span style={{fontFamily:'var(--sans)',fontSize:14,fontWeight:700,
+              color: rule.points>=300?'var(--red)':rule.points>=150?'var(--amber)':'var(--teal)'}}>
+              +{rule.points}
+            </span>
+            <div style={{fontSize:7,color:'var(--border2)'}}>puntos</div>
+          </div>
+        )}
+      </div>
+
+      {/* Acciones */}
+      {rule.editable && (
+        <div style={{display:'flex',gap:4,flexShrink:0}}>
+          {isEditing ? (<>
+            <button className="btn btn-teal" style={{padding:'3px 8px',fontSize:8}} disabled={saving} onClick={onSave}>Guardar</button>
+            <button className="btn btn-ghost" style={{padding:'3px 8px',fontSize:8}} onClick={onCancel}>✕</button>
+          </>) : (
+            <button className="btn btn-ghost" style={{padding:'3px 8px',fontSize:8}} onClick={onEdit}>Editar</button>
+          )}
+        </div>
+      )}
+      {!rule.editable && (
+        <div style={{width:54,textAlign:'center'}}>
+          <span style={{fontSize:7,color:'var(--border2)'}}>FIJA</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+function NetworkGraph({deviceAlerts, channel, showToast}) {
+  const svgRef = useRef(null);
+  const [tooltip, setTooltip] = React.useState(null);
+  const [selectedNode, setSelectedNode] = React.useState(null);
+  const [filter, setFilter] = React.useState('ALL');
+  const [zoom, setZoom] = React.useState(1);
+
+  // Construir grafo desde deviceAlerts
+  const buildGraph = React.useCallback(() => {
+    const nodes = [];
+    const links = [];
+    const nodeMap = {};
+
+    const addNode = (id, type, label, risk, meta) => {
+      if (!nodeMap[id]) {
+        nodeMap[id] = {id, type, label, risk: risk||0, meta: meta||{}, connections: 0};
+        nodes.push(nodeMap[id]);
+      }
+      return nodeMap[id];
+    };
+
+    const alerts = filter === 'ALL'
+      ? deviceAlerts
+      : deviceAlerts.filter(a => a.severity === filter);
+
+    alerts.forEach(alert => {
+      // Nodo central del alerta
+      const alertId = 'alert_' + alert.id;
+      const alertNode = addNode(alertId, 'alert', alert.title.slice(0,30), alert.risk, {
+        type: alert.type, severity: alert.severity, detail: alert.detail
+      });
+
+      // Nodos de cuentas
+      (alert.accounts||[]).forEach(acc => {
+        const accId = 'acc_' + acc;
+        const accNode = addNode(accId, 'account', acc.slice(0,20), 0, {account: acc});
+        links.push({source: alertId, target: accId, type: alert.type});
+        alertNode.connections++;
+        accNode.connections++;
+        accNode.risk = Math.max(accNode.risk, alert.risk * 0.6);
+      });
+
+      // Nodos de IPs
+      (alert.ips||[]).forEach(ip => {
+        const ipId = 'ip_' + ip;
+        const ipNode = addNode(ipId, 'ip', ip, 0, {ip});
+        links.push({source: alertId, target: ipId, type: 'IP'});
+        alertNode.connections++;
+        ipNode.connections++;
+        ipNode.risk = Math.max(ipNode.risk, alert.risk * 0.4);
+      });
+    });
+
+    return {nodes, links};
+  }, [deviceAlerts, filter]);
+
+  // Renderizar con D3 force simulation
+  useEffect(() => {
+    if (!svgRef.current) return;
+    const graph = buildGraph();
+    if (!graph.nodes.length) return;
+
+    const container = svgRef.current.parentElement;
+    const W = container.clientWidth || 900;
+    const H = container.clientHeight || 500;
+
+    // Limpiar SVG anterior
+    const svgEl = svgRef.current;
+    while (svgEl.firstChild) svgEl.removeChild(svgEl.firstChild);
+
+    const svg = d3.select(svgEl)
+      .attr('width', W).attr('height', H);
+
+    // Defs para gradientes/markers
+    const defs = svg.append('defs');
+    defs.append('marker')
+      .attr('id','arrow').attr('viewBox','0 -5 10 10')
+      .attr('refX',22).attr('refY',0)
+      .attr('markerWidth',6).attr('markerHeight',6)
+      .attr('orient','auto')
+      .append('path').attr('d','M0,-5L10,0L0,5').attr('fill','rgba(255,255,255,.15)');
+
+    // Grupo principal con zoom/pan
+    const g = svg.append('g').attr('class','graph-root');
+    svg.call(
+      d3.zoom().scaleExtent([0.2, 4])
+        .on('zoom', ev => {
+          g.attr('transform', ev.transform);
+          setZoom(Math.round(ev.transform.k * 100));
+        })
+    );
+
+    // Color por tipo/riesgo
+    const nodeColor = (d) => {
+      if (d.type === 'alert') {
+        if (d.risk >= 700) return '#ff3b5c';
+        if (d.risk >= 450) return '#f59e0b';
+        return '#f97316';
+      }
+      if (d.type === 'account') return d.risk > 400 ? '#c42040' : '#3b82f6';
+      if (d.type === 'ip') return '#a855f7';
+      return '#6b7280';
+    };
+
+    const nodeRadius = (d) => {
+      if (d.type === 'alert') return Math.max(12, Math.min(28, 10 + d.connections * 3));
+      return d.type === 'account' ? 10 : 8;
+    };
+
+    const linkColor = (d) => {
+      if (d.type === 'DEVICE_SHARING') return 'rgba(255,59,92,.4)';
+      if (d.type === 'SHARED_IP' || d.type === 'IP') return 'rgba(168,85,247,.35)';
+      if (d.type === 'DUPLICATE_FINGERPRINT') return 'rgba(245,158,11,.35)';
+      return 'rgba(255,255,255,.1)';
+    };
+
+    // Simulación de fuerzas
+    const sim = d3.forceSimulation(graph.nodes)
+      .force('link', d3.forceLink(graph.links).id(d => d.id).distance(d => {
+        if (d.source.type === 'alert') return 90;
+        return 60;
+      }).strength(0.7))
+      .force('charge', d3.forceManyBody().strength(-220))
+      .force('center', d3.forceCenter(W/2, H/2))
+      .force('collision', d3.forceCollide().radius(d => nodeRadius(d) + 8));
+
+    // Links
+    const link = g.append('g').selectAll('line')
+      .data(graph.links).join('line')
+      .attr('stroke', d => linkColor(d))
+      .attr('stroke-width', 1.5)
+      .attr('marker-end', 'url(#arrow)');
+
+    // Nodos — grupo
+    const node = g.append('g').selectAll('g')
+      .data(graph.nodes).join('g')
+      .attr('cursor', 'pointer')
+      .call(d3.drag()
+        .on('start', (ev, d) => { if (!ev.active) sim.alphaTarget(0.3).restart(); d.fx=d.x; d.fy=d.y; })
+        .on('drag',  (ev, d) => { d.fx=ev.x; d.fy=ev.y; })
+        .on('end',   (ev, d) => { if (!ev.active) sim.alphaTarget(0); d.fx=null; d.fy=null; })
+      )
+      .on('mouseenter', (ev, d) => {
+        setTooltip({x: ev.offsetX, y: ev.offsetY, node: d});
+        setSelectedNode(d.id);
+      })
+      .on('mouseleave', () => { setTooltip(null); setSelectedNode(null); });
+
+    // Círculo exterior (glow para alertas)
+    node.filter(d => d.type === 'alert')
+      .append('circle')
+      .attr('r', d => nodeRadius(d) + 6)
+      .attr('fill', 'none')
+      .attr('stroke', d => nodeColor(d))
+      .attr('stroke-width', 1)
+      .attr('opacity', 0.3);
+
+    // Círculo principal
+    node.append('circle')
+      .attr('r', d => nodeRadius(d))
+      .attr('fill', d => nodeColor(d))
+      .attr('stroke', '#07080c')
+      .attr('stroke-width', 2)
+      .attr('opacity', d => d.type === 'alert' ? 1 : 0.85);
+
+    // Icono interno
+    node.append('text')
+      .attr('text-anchor', 'middle')
+      .attr('dominant-baseline', 'central')
+      .attr('font-size', d => d.type === 'alert' ? 11 : 9)
+      .attr('fill', '#fff')
+      .attr('pointer-events', 'none')
+      .text(d => d.type === 'alert' ? '!' : d.type === 'ip' ? 'IP' : '#');
+
+    // Label debajo
+    node.append('text')
+      .attr('text-anchor', 'middle')
+      .attr('y', d => nodeRadius(d) + 12)
+      .attr('font-size', 8)
+      .attr('fill', 'rgba(255,255,255,.5)')
+      .attr('pointer-events', 'none')
+      .text(d => d.label.slice(0, 16) + (d.label.length > 16 ? '...' : ''));
+
+    // Tick
+    sim.on('tick', () => {
+      link
+        .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+        .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+      node.attr('transform', d => 'translate('+d.x+','+d.y+')');
+    });
+
+    return () => sim.stop();
+  }, [buildGraph]);
+
+  const graph = buildGraph();
+  const alertNodes  = graph.nodes.filter(n => n.type === 'alert').length;
+  const accountNodes = graph.nodes.filter(n => n.type === 'account').length;
+  const ipNodes     = graph.nodes.filter(n => n.type === 'ip').length;
+  const critNodes   = graph.nodes.filter(n => n.risk >= 700).length;
+
+  const sevColor = s => s==='CRITICO'?'var(--red)':s==='ALTO'?'var(--amber)':'var(--orange)';
+
+  return (
+    <div>
+      <div className="page-title">Red de Riesgo</div>
+      <div className="page-sub">Mapa interactivo de compromisos — nodos, cuentas e IPs relacionadas</div>
+
+      {deviceAlerts.length === 0 && (
+        <div className="card" style={{textAlign:'center',padding:'60px',opacity:.5}}>
+          <div style={{fontSize:40,marginBottom:12}}>🕸</div>
+          <div style={{fontSize:12,color:'var(--slate)'}}>Sin datos de red</div>
+          <div style={{fontSize:10,color:'var(--border2)',marginTop:6}}>Carga un archivo de sesiones en Carga Masiva para generar la red</div>
+        </div>
+      )}
+
+      {deviceAlerts.length > 0 && (<>
+        {/* KPIs */}
+        <div className="grid-4" style={{marginBottom:14}}>
+          {[['Nodos alerta',alertNodes,'var(--red)'],['Cuentas',accountNodes,'var(--blue)'],['IPs',ipNodes,'var(--purple)'],['Riesgo critico',critNodes,'var(--red)']].map(([l,v,c])=>(
+            <div className="card" key={l}><div className="card-title">{l}</div><div style={{fontFamily:'var(--sans)',fontSize:24,fontWeight:800,color:c}}>{v}</div></div>
+          ))}
+        </div>
+
+        {/* Controles */}
+        <div style={{display:'flex',gap:8,marginBottom:12,alignItems:'center',flexWrap:'wrap'}}>
+          <span style={{fontSize:9,color:'var(--slate)'}}>Filtrar severidad:</span>
+          {['ALL','CRITICO','ALTO','MEDIO'].map(s=>(
+            <button key={s} onClick={()=>setFilter(s)}
+              style={{padding:'3px 10px',borderRadius:4,border:'1px solid',fontSize:8,fontFamily:'var(--mono)',cursor:'pointer',
+                background:filter===s?(s==='CRITICO'?'rgba(255,59,92,.15)':s==='ALTO'?'rgba(245,158,11,.12)':s==='MEDIO'?'rgba(249,115,22,.1)':'rgba(20,184,166,.1)'):'var(--bg3)',
+                borderColor:filter===s?(s==='CRITICO'?'rgba(255,59,92,.5)':s==='ALTO'?'rgba(245,158,11,.5)':s==='MEDIO'?'rgba(249,115,22,.5)':'rgba(20,184,166,.4)'):'var(--border2)',
+                color:filter===s?(s==='CRITICO'?'var(--red)':s==='ALTO'?'var(--amber)':s==='MEDIO'?'var(--orange)':'var(--teal)'):'var(--muted)'}}>
+              {s}
+            </button>
+          ))}
+          <span style={{marginLeft:'auto',fontSize:9,color:'var(--slate)'}}>Zoom: {zoom}% · Arrastra nodos · Scroll para zoom</span>
+        </div>
+
+        {/* Leyenda */}
+        <div className="net-legend">
+          {[['Alerta critica','#ff3b5c'],['Alerta alta','#f59e0b'],['Alerta media','#f97316'],['Cuenta comprometida','#c42040'],['Cuenta','#3b82f6'],['IP','#a855f7']].map(([l,c])=>(
+            <div key={l} className="net-legend-item"><div className="net-legend-dot" style={{background:c}}/>{l}</div>
+          ))}
+          <div className="net-legend-item"><div style={{width:24,height:2,background:'rgba(255,59,92,.4)',borderRadius:1}}/> Dispositivo compartido</div>
+          <div className="net-legend-item"><div style={{width:24,height:2,background:'rgba(168,85,247,.35)',borderRadius:1}}/> IP compartida</div>
+        </div>
+
+        {/* Canvas SVG */}
+        <div className="net-canvas">
+          <svg ref={svgRef} style={{width:'100%',height:'100%'}}/>
+          {tooltip && (
+            <div className="net-tooltip" style={{left: Math.min(tooltip.x+12, (svgRef.current?.parentElement?.clientWidth||900)-230), top: tooltip.y-10}}>
+              <div style={{fontWeight:600,marginBottom:4,color:
+                tooltip.node.type==='alert'?(tooltip.node.risk>=700?'var(--red)':tooltip.node.risk>=450?'var(--amber)':'var(--orange)'):
+                tooltip.node.type==='ip'?'var(--purple)':'var(--blue)'}}>
+                {tooltip.node.type==='alert'?'Alerta':tooltip.node.type==='ip'?'IP':'Cuenta'}
+              </div>
+              <div style={{color:'var(--light)',wordBreak:'break-all',marginBottom:4}}>{tooltip.node.label}</div>
+              {tooltip.node.risk > 0 && <div style={{fontSize:8,color:'var(--slate)'}}>Riesgo: <span style={{color:'var(--amber)'}}>{tooltip.node.risk}</span></div>}
+              {tooltip.node.meta?.severity && <div style={{fontSize:8,color:sevColor(tooltip.node.meta.severity)}}>Severidad: {tooltip.node.meta.severity}</div>}
+              {tooltip.node.meta?.detail && <div style={{fontSize:8,color:'var(--slate)',marginTop:3}}>{tooltip.node.meta.detail.slice(0,80)}</div>}
+              <div style={{fontSize:8,color:'var(--border2)',marginTop:3}}>Conexiones: {tooltip.node.connections}</div>
+            </div>
+          )}
+          {graph.nodes.length === 0 && (
+            <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:8,opacity:.4}}>
+              <div style={{fontSize:32}}>🕸</div>
+              <div style={{fontSize:10,color:'var(--slate)'}}>Sin nodos para este filtro</div>
+            </div>
+          )}
+        </div>
+
+        {/* Panel detalle del nodo seleccionado */}
+        {selectedNode && (() => {
+          const n = graph.nodes.find(x => x.id === selectedNode);
+          if (!n) return null;
+          const related = graph.links.filter(l => l.source.id === selectedNode || l.target.id === selectedNode);
+          return (
+            <div className="card" style={{marginTop:12,border:'1px solid var(--border2)'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+                <div style={{fontFamily:'var(--sans)',fontSize:13,fontWeight:700,color:'var(--white)'}}>
+                  {n.type==='alert'?'Alerta':n.type==='ip'?'IP':' Cuenta'}: {n.label}
+                </div>
+                <span style={{fontFamily:'var(--sans)',fontSize:20,fontWeight:800,color:n.risk>=700?'var(--red)':n.risk>=450?'var(--amber)':'var(--orange)'}}>{n.risk}</span>
+              </div>
+              <div style={{fontSize:9,color:'var(--slate)'}}>Conexiones directas: <span style={{color:'var(--light)'}}>{related.length}</span></div>
+              {n.meta?.detail && <div style={{fontSize:9,color:'var(--muted)',marginTop:4}}>{n.meta.detail}</div>}
+            </div>
+          );
+        })()}
+      </>)}
+    </div>
+  );
+}
+
+
 function App() {
   const [page,setPage]=useState('dashboard');
   const [apiUrl,setApiUrl]=useState(API_BASE);
@@ -2125,6 +2718,12 @@ function App() {
     try{return JSON.parse(localStorage.getItem('auth_user'));}catch(e){return null;}
   });
   const [authed,setAuthed]=useState(()=>!!localStorage.getItem('auth_token'));
+  const [channel,setChannel]=useState(()=>localStorage.getItem('global_channel')||'ALL');
+
+  const changeChannel=useCallback((ch)=>{
+    setChannel(ch);
+    localStorage.setItem('global_channel',ch);
+  },[]);
 
   const showToast=useCallback((msg,type='ok')=>{
     setToast({msg,type});setTimeout(()=>setToast(null),3500);
@@ -2186,9 +2785,11 @@ function App() {
     {id:'dashboard',icon:'📊',label:'Dashboard'},
     {id:'alerts',icon:'🔔',label:'Alertas',badge:totalBadge},
     {id:'other_alerts',icon:'🛡',label:'Otras Alertas',badge:devicePending},
+    {id:'network',icon:'🕸',label:'Red de Riesgo'},
     {id:'profiles',icon:'👤',label:'Perfiles'},
     {id:'upload',icon:'📤',label:'Carga Masiva'},
     {id:'entities',icon:'🏛',label:'Entidades'},
+    {id:'rules',icon:'⚙',label:'Reglas'},
     {id:'model',icon:'🤖',label:'Modelo ML'},
   ];
 
@@ -2222,6 +2823,11 @@ function App() {
           <span className={'api-badge '+(apiOk==='ok'?'api-ok':apiOk==='err'?'api-err':'api-testing')}>
             {apiOk==='ok'?'CONECTADO':apiOk==='err'?'ERROR':'PROBANDO'}
           </span>
+        </div>
+        <div className="ch-bar">
+          {[['ALL','TODOS','ch-btn-all'],['CARD','CARD','ch-btn-card'],['TRANSFER','TRANSFER','ch-btn-transfer'],['WALLET','WALLET','ch-btn-wallet'],['ATM','ATM','ch-btn-atm'],['DIGITAL_BANKING','DIGITAL','ch-btn-digital']].map(([ch,label,cls])=>(
+            <button key={ch} className={'ch-btn '+cls+(channel===ch?' sel':'')} onClick={()=>changeChannel(ch)}>{label}</button>
+          ))}
         </div>
         <div className="topbar-right">
           <div className="pulse"/><span>LIVE</span>
@@ -2266,12 +2872,14 @@ function App() {
       </div>
 
       <div className="main">
-        {page==='dashboard'&&<Dashboard entity={activeEntity} toast={showToast}/>}
-        {page==='alerts'&&<Alerts entity={activeEntity} showToast={showToast}/>}
+        {page==='dashboard'&&<Dashboard entity={activeEntity} channel={channel} toast={showToast}/>}
+        {page==='alerts'&&<Alerts entity={activeEntity} channel={channel} showToast={showToast}/>}
         {page==='other_alerts'&&<OtherAlerts alerts={deviceAlerts} setAlerts={setDeviceAlerts} showToast={showToast}/>}
-        {page==='profiles'&&<Profiles entity={activeEntity} showToast={showToast}/>}
+        {page==='network'&&<NetworkGraph deviceAlerts={deviceAlerts} channel={channel} showToast={showToast}/>}
+        {page==='profiles'&&<Profiles entity={activeEntity} channel={channel} showToast={showToast}/>}
         {page==='upload'&&<UploadPage entity={activeEntity} showToast={showToast} onDeviceResult={onDeviceResult}/>}
         {page==='entities'&&<Entities onEntityChange={loadEntities} showToast={showToast}/>}
+        {page==='rules'&&<RulesEditor channel={channel} showToast={showToast}/>}
         {page==='model'&&<ModelPage entity={activeEntity} showToast={showToast}/>}
       </div>
 
