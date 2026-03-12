@@ -1,7 +1,7 @@
 """
 Auth Routes — Register, Login, Admin panel, Upload masivo
 """
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Request
 from sqlalchemy.orm import Session
 from datetime import datetime
 import io, uuid
@@ -242,6 +242,7 @@ ACCEPTED_EXTENSIONS = (".xlsx", ".xls", ".csv", ".tsv", ".txt", ".ods")
 
 @router.post("/upload")
 async def upload_transactions(
+    request: Request,
     file: UploadFile = File(...),
     mapping: str = None,
     current_user: User = Depends(get_current_user),
@@ -252,6 +253,18 @@ async def upload_transactions(
     Acepta: .xlsx, .xls, .csv, .tsv, .txt
     mapping: JSON string {"amount":"col_excel","channel":"col_excel",...}
     """
+    # Rate limit: max 5 uploads por IP por minuto
+    import time as _time
+    from collections import defaultdict
+    if not hasattr(upload_transactions, '_rate_store'):
+        upload_transactions._rate_store = defaultdict(list)
+    ip  = request.client.host if request.client else "unknown"
+    now = _time.time()
+    upload_transactions._rate_store[ip] = [t for t in upload_transactions._rate_store[ip] if now - t < 60]
+    if len(upload_transactions._rate_store[ip]) >= 5:
+        raise HTTPException(429, "Máximo 5 uploads por minuto. Espera un momento.")
+    upload_transactions._rate_store[ip].append(now)
+
     import json as _json
 
     fname = (file.filename or "").lower()
@@ -494,4 +507,3 @@ def download_template():
             "Las fechas aceptan: YYYY-MM-DD HH:MM, YYYY-MM-DDTHH:MM:SS, DD/MM/YYYY",
         ]
     }
-# v2 - csv support
