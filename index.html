@@ -1173,6 +1173,171 @@ function NetworkGraph({entity,channel,showToast,deviceResult}){
   );
 }
 
+/* ══════════ OTHER ALERTS ══════════ */
+function OtherAlerts({alerts,setAlerts,showToast}){
+  const [filter,setFilter]=useState('ALL');
+  const [selected,setSel]=useState(null);
+  const [typeFilter,setTypeFilter]=useState('ALL');
+
+  const sevColor=(s)=>s==='CRÍTICO'?'var(--red)':s==='ALTO'?'var(--amber)':s==='MEDIO'?'var(--orange)':'var(--slate)';
+  const sevBg=(s)=>s==='CRÍTICO'?'rgba(255,59,92,.1)':s==='ALTO'?'rgba(245,158,11,.08)':s==='MEDIO'?'rgba(249,115,22,.07)':'var(--bg3)';
+  const typeLabel={DEVICE_SHARING:'📱 Device Sharing',SHARED_IP:'🌐 IP Compartida',DUPLICATE_FINGERPRINT:'🔑 Fingerprint Dup.'};
+  const typeColors={DEVICE_SHARING:'var(--red)',SHARED_IP:'var(--amber)',DUPLICATE_FINGERPRINT:'var(--purple)'};
+
+  const markReviewed=(id)=>{
+    const updated=alerts.map(a=>a.id===id?{...a,reviewed:true,reviewed_at:new Date().toISOString()}:a);
+    setAlerts(updated);
+    if(selected===id)setSel(null);
+    showToast('✅ Alerta marcada como revisada','ok');
+  };
+  const clearAll=()=>{if(!confirm('¿Eliminar todas las alertas de dispositivos?'))return;setAlerts([]);showToast('Alertas eliminadas','ok');};
+
+  const types=['ALL','DEVICE_SHARING','SHARED_IP','DUPLICATE_FINGERPRINT'];
+  const filtered=alerts.filter(a=>{
+    const statusOk=filter==='ALL'||(filter==='PENDING'&&!a.reviewed)||(filter==='REVIEWED'&&a.reviewed);
+    const typeOk=typeFilter==='ALL'||a.type===typeFilter;
+    return statusOk&&typeOk;
+  });
+  const pending=alerts.filter(a=>!a.reviewed).length;
+  const selAlert=selected?filtered.find(a=>a.id===selected):null;
+
+  const counts={CRÍTICO:alerts.filter(a=>a.severity==='CRÍTICO'&&!a.reviewed).length,ALTO:alerts.filter(a=>a.severity==='ALTO'&&!a.reviewed).length,MEDIO:alerts.filter(a=>a.severity==='MEDIO'&&!a.reviewed).length};
+
+  return(
+    <div className="split" style={{marginTop:-20,marginLeft:-20,marginRight:-20}}>
+      {/* ── Lista izquierda ── */}
+      <div style={{display:'flex',flexDirection:'column',overflow:'hidden',borderRight:'1px solid var(--border)'}}>
+        <div style={{padding:'12px 14px',borderBottom:'1px solid var(--border)',background:'var(--bg2)',flexShrink:0}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+            <div style={{fontFamily:'var(--sans)',fontSize:14,fontWeight:700,color:'var(--white)'}}>🛡️ Otras Alertas <span style={{color:'var(--slate)',fontWeight:400,fontSize:12}}>({alerts.length})</span></div>
+            {alerts.length>0&&<button onClick={clearAll} style={{fontSize:8,padding:'2px 8px',background:'none',border:'1px solid var(--border2)',color:'var(--slate)',borderRadius:4,cursor:'pointer',fontFamily:'var(--mono)'}}>Limpiar todo</button>}
+          </div>
+          {/* Contadores por severidad */}
+          {pending>0&&<div style={{display:'flex',gap:6,marginBottom:8}}>
+            {[['CRÍTICO',counts.CRÍTICO,'var(--red)'],['ALTO',counts.ALTO,'var(--amber)'],['MEDIO',counts.MEDIO,'var(--orange)']].map(([s,n,c])=>n>0&&(
+              <div key={s} style={{padding:'3px 8px',borderRadius:4,background:sevBg(s),border:`1px solid ${c}40`,fontSize:8,fontWeight:700,color:c}}>{n} {s}</div>
+            ))}
+          </div>}
+          {/* Filtros */}
+          <div style={{display:'flex',gap:4,marginBottom:6,flexWrap:'wrap'}}>
+            {[['ALL','Todas'],['PENDING','Pendientes'],['REVIEWED','Revisadas']].map(([f,l])=>(
+              <button key={f} onClick={()=>setFilter(f)} style={{padding:'3px 8px',borderRadius:4,border:'1px solid',fontSize:8,fontFamily:'var(--mono)',cursor:'pointer',background:filter===f?'var(--red3)':'var(--bg3)',borderColor:filter===f?'rgba(255,59,92,.4)':'var(--border2)',color:filter===f?'var(--red)':'var(--muted)'}}>{l}</button>
+            ))}
+          </div>
+          <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+            {types.map(t=>(
+              <button key={t} onClick={()=>setTypeFilter(t)} style={{padding:'2px 7px',borderRadius:4,border:'1px solid',fontSize:7,fontFamily:'var(--mono)',cursor:'pointer',background:typeFilter===t?'rgba(168,85,247,.15)':'var(--bg3)',borderColor:typeFilter===t?'rgba(168,85,247,.4)':'var(--border2)',color:typeFilter===t?'var(--purple)':'var(--muted)'}}>{t==='ALL'?'Todos los tipos':typeLabel[t]||t}</button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{overflowY:'auto',flex:1}}>
+          {filtered.length===0&&<div className="center" style={{flexDirection:'column',gap:8,height:200}}>
+            <div style={{fontSize:28,opacity:.2}}>🛡️</div>
+            <div style={{fontSize:10,color:'var(--slate)'}}>{alerts.length===0?'Sin alertas. Sube un archivo de dispositivos en Carga Masiva.':'Sin alertas con este filtro'}</div>
+          </div>}
+          {filtered.map(a=>(
+            <div key={a.id} onClick={()=>setSel(a.id)} style={{padding:'10px 14px',borderBottom:'1px solid var(--border)',cursor:'pointer',background:selected===a.id?'var(--bg3)':'transparent',borderLeft:`3px solid ${selected===a.id?sevColor(a.severity):'transparent'}`,opacity:a.reviewed?.8:1}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:10,color:a.reviewed?'var(--muted)':'var(--white)',fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{a.title}</div>
+                  <div style={{fontSize:8,color:'var(--slate)',marginTop:2}}>{typeLabel[a.type]||a.type} · {a.created_at?new Date(a.created_at).toLocaleString('es-EC',{dateStyle:'short',timeStyle:'short'}):''}</div>
+                </div>
+                <div style={{display:'flex',gap:4,alignItems:'center',flexShrink:0,marginLeft:8}}>
+                  <span style={{fontFamily:'var(--sans)',fontSize:16,fontWeight:800,color:a.reviewed?'var(--slate)':sevColor(a.severity)}}>{a.risk}</span>
+                  {a.reviewed?<span style={{fontSize:7,padding:'1px 5px',borderRadius:3,background:'var(--bg4)',color:'var(--slate)',border:'1px solid var(--border2)'}}>✓</span>:
+                  <span style={{fontSize:7,padding:'1px 5px',borderRadius:3,background:sevBg(a.severity),color:sevColor(a.severity),border:`1px solid ${sevColor(a.severity)}50`,fontWeight:700}}>{a.severity}</span>}
+                </div>
+              </div>
+              <div style={{fontSize:9,color:'var(--slate)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{a.detail}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Detalle derecha ── */}
+      {!selAlert&&<div className="split-left" style={{display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:8,color:'var(--slate)'}}>
+        <div style={{fontSize:32,opacity:.2}}>🛡️</div>
+        <div style={{fontSize:11}}>Selecciona una alerta para ver el detalle</div>
+        {alerts.length===0&&<div style={{fontSize:10,marginTop:8,textAlign:'center',maxWidth:260,lineHeight:1.6}}>Las alertas de dispositivos se generan automáticamente cuando subes un archivo de sesiones/dispositivos en <strong style={{color:'var(--white)'}}>📤 Carga Masiva</strong></div>}
+      </div>}
+
+      {selAlert&&(
+        <div className="split-left">
+          {/* Header */}
+          <div style={{background:'var(--bg2)',border:`1px solid ${sevColor(selAlert.severity)}30`,borderLeft:`3px solid ${sevColor(selAlert.severity)}`,borderRadius:10,padding:'14px 16px',marginBottom:12}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:8}}>
+              <div style={{flex:1}}>
+                <div style={{fontFamily:'var(--sans)',fontSize:14,fontWeight:700,color:'var(--white)',marginBottom:4}}>{selAlert.title}</div>
+                <div style={{fontSize:9,color:'var(--slate)'}}>{typeLabel[selAlert.type]||selAlert.type} · {selAlert.created_at?new Date(selAlert.created_at).toLocaleString('es-EC',{dateStyle:'medium',timeStyle:'short'}):''}</div>
+              </div>
+              <div style={{textAlign:'right',flexShrink:0,marginLeft:12}}>
+                <div style={{fontFamily:'var(--sans)',fontSize:28,fontWeight:800,color:sevColor(selAlert.severity)}}>{selAlert.risk}</div>
+                <span style={{padding:'3px 9px',borderRadius:4,fontSize:9,fontWeight:700,background:sevBg(selAlert.severity),color:sevColor(selAlert.severity),border:`1px solid ${sevColor(selAlert.severity)}50`}}>{selAlert.severity}</span>
+              </div>
+            </div>
+            <div style={{fontSize:10,color:'var(--muted)',lineHeight:1.6,marginBottom:10}}>{selAlert.detail}</div>
+            <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+              {selAlert.evidence?.map((ev,i)=>(
+                <span key={i} style={{fontSize:9,padding:'3px 8px',background:'var(--bg3)',borderRadius:4,color:'var(--muted)',border:'1px solid var(--border)'}}>{ev}</span>
+              ))}
+            </div>
+          </div>
+
+          {/* Cuentas afectadas */}
+          {selAlert.accounts?.length>0&&(
+            <div style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:10,padding:'12px 14px',marginBottom:12}}>
+              <div style={{fontSize:8,color:'var(--slate)',letterSpacing:'.12em',marginBottom:8}}>IDENTIDADES / CUENTAS AFECTADAS ({selAlert.accounts.length})</div>
+              <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
+                {selAlert.accounts.map((a,i)=>(
+                  <div key={i} style={{fontSize:9,padding:'4px 8px',background:'rgba(255,59,92,.08)',border:'1px solid rgba(255,59,92,.2)',borderRadius:4,color:'var(--light)',fontFamily:'var(--mono)'}}>{a.length>36?a.slice(0,36)+'…':a}</div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* IPs o fingerprint */}
+          {selAlert.ips?.length>0&&(
+            <div style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:10,padding:'12px 14px',marginBottom:12}}>
+              <div style={{fontSize:8,color:'var(--slate)',letterSpacing:'.12em',marginBottom:8}}>IPs REGISTRADAS ({selAlert.ips.length})</div>
+              <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
+                {selAlert.ips.map((ip,i)=>(
+                  <div key={i} style={{fontSize:9,padding:'3px 8px',background:'rgba(245,158,11,.08)',border:'1px solid rgba(245,158,11,.2)',borderRadius:4,color:'var(--amber)',fontFamily:'var(--mono)'}}>{ip}</div>
+                ))}
+              </div>
+            </div>
+          )}
+          {selAlert.ip&&(
+            <div style={{background:'var(--bg2)',border:'1px solid rgba(245,158,11,.2)',borderRadius:10,padding:'12px 14px',marginBottom:12}}>
+              <div style={{fontSize:8,color:'var(--slate)',letterSpacing:'.12em',marginBottom:6}}>IP SOSPECHOSA</div>
+              <div style={{fontSize:13,color:'var(--amber)',fontFamily:'var(--mono)',fontWeight:600}}>{selAlert.ip}</div>
+            </div>
+          )}
+          {selAlert.fp&&(
+            <div style={{background:'var(--bg2)',border:'1px solid rgba(168,85,247,.2)',borderRadius:10,padding:'12px 14px',marginBottom:12}}>
+              <div style={{fontSize:8,color:'var(--slate)',letterSpacing:'.12em',marginBottom:6}}>DEVICE FINGERPRINT</div>
+              <div style={{fontSize:10,color:'var(--purple)',fontFamily:'var(--mono)',wordBreak:'break-all'}}>{selAlert.fp}</div>
+            </div>
+          )}
+
+          {/* Acción */}
+          <div style={{marginTop:4}}>
+            {selAlert.reviewed?(
+              <div style={{padding:'10px 14px',background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:8,fontSize:10,color:'var(--teal)',display:'flex',alignItems:'center',gap:6}}>
+                ✅ Revisada el {new Date(selAlert.reviewed_at).toLocaleString('es-EC',{dateStyle:'short',timeStyle:'short'})}
+              </div>
+            ):(
+              <button className="btn btn-teal" style={{width:'100%',padding:'11px'}} onClick={()=>markReviewed(selAlert.id)}>
+                ✓ Marcar como revisada
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ══════════ RULES EDITOR ══════════ */
 function RulesEditor({entity,showToast}){
   const DEFAULT_RULES=[
@@ -1399,6 +1564,7 @@ function AdminPanel({showToast,onBack}){
 function App(){
   const [page,setPage]=useState('dashboard');const [apiUrl,setApiUrl]=useState(API_BASE);const [apiOk,setApiOk]=useState(null);const [entity,setEntity]=useState('DEMO');const [entities,setEntities]=useState([]);const [pending,setPending]=useState(0);const [toast,setToast]=useState(null);const [channel,setChannel]=useState('ALL');
   const [deviceResult,setDeviceResult]=useState(null);
+  const [deviceAlerts,setDeviceAlerts]=useState(()=>{try{const s=localStorage.getItem('device_alerts');return s?JSON.parse(s):[];}catch{return[];}});
   const [user,setUser]=useState(()=>{try{return JSON.parse(localStorage.getItem('auth_user'));}catch{return null;}});
   const [authed,setAuthed]=useState(()=>!!localStorage.getItem('auth_token'));
   const showToast=useCallback((msg,type='ok')=>{setToast({msg,type});setTimeout(()=>setToast(null),3500);},[]);
@@ -1410,7 +1576,8 @@ function App(){
   useEffect(()=>{testApi(apiUrl);const t=setInterval(()=>{loadEntities();loadPending();},8000);loadEntities();loadPending();return()=>clearInterval(t);},[]);
   useEffect(()=>{loadPending();},[entity,page]);
   const activeEntity=user&&user.role!=='superadmin'&&user.entity_code?user.entity_code:entity;
-  const nav=[{id:'dashboard',icon:'📊',label:'Dashboard'},{id:'alerts',icon:'🔔',label:'Alertas',badge:pending},{id:'profiles',icon:'👤',label:'Perfiles'},{id:'network',icon:'🕸',label:'Red de Riesgo'},{id:'upload',icon:'📤',label:'Carga Masiva'},{id:'rules',icon:'⚙️',label:'Reglas'},{id:'entities',icon:'🏛',label:'Entidades'},{id:'model',icon:'🤖',label:'Modelo ML'}];
+  const totalBadge=pending+(deviceAlerts.filter(a=>!a.reviewed).length);
+  const nav=[{id:'dashboard',icon:'📊',label:'Dashboard'},{id:'alerts',icon:'🔔',label:'Alertas',badge:totalBadge},{id:'other_alerts',icon:'🛡️',label:'Otras Alertas',badge:deviceAlerts.filter(a=>!a.reviewed).length},{id:'profiles',icon:'👤',label:'Perfiles'},{id:'network',icon:'🕸',label:'Red de Riesgo'},{id:'upload',icon:'📤',label:'Carga Masiva'},{id:'rules',icon:'⚙️',label:'Reglas'},{id:'entities',icon:'🏛',label:'Entidades'},{id:'model',icon:'🤖',label:'Modelo ML'}];
   if(!authed)return<LoginScreen onLogin={onLogin} apiUrl={apiUrl} setApiUrl={setApiUrl} testApi={testApi} apiOk={apiOk}/>;
   if(page==='admin')return(
     <div style={{background:'var(--bg)',minHeight:'100vh'}}>
@@ -1437,7 +1604,20 @@ function App(){
         {page==='alerts'&&<Alerts entity={activeEntity} channel={channel} showToast={showToast}/>}
         {page==='profiles'&&<Profiles entity={activeEntity} channel={channel} showToast={showToast}/>}
         {page==='network'&&<NetworkGraph entity={activeEntity} channel={channel} showToast={showToast} deviceResult={deviceResult}/>}
-        {page==='upload'&&<UploadPage entity={activeEntity} showToast={showToast} onDeviceResult={(r)=>{setDeviceResult(r);setTimeout(()=>setPage('network'),1200);}}/>}
+        {page==='other_alerts'&&<OtherAlerts alerts={deviceAlerts} setAlerts={(a)=>{setDeviceAlerts(a);try{localStorage.setItem('device_alerts',JSON.stringify(a));}catch(e){}}} showToast={showToast}/>}
+        {page==='upload'&&<UploadPage entity={activeEntity} showToast={showToast} onDeviceResult={(r)=>{
+          setDeviceResult(r);
+          if(r.alerts&&r.alerts.length>0){
+            const stamped=r.alerts.map(a=>({...a,created_at:new Date().toISOString(),source_file:r.source_file||'archivo_dispositivos'}));
+            setDeviceAlerts(prev=>{
+              const merged=[...stamped,...prev];
+              try{localStorage.setItem('device_alerts',JSON.stringify(merged.slice(0,500)));}catch(e){}
+              return merged.slice(0,500);
+            });
+            showToast('🚨 '+r.alerts.length+' alertas guardadas en Otras Alertas','ok');
+          }
+          setTimeout(()=>setPage('other_alerts'),1200);
+        }}/>}
         {page==='rules'&&<RulesEditor entity={activeEntity} showToast={showToast}/>}
         {page==='entities'&&<Entities onEntityChange={loadEntities} showToast={showToast}/>}
         {page==='model'&&<ModelPage entity={activeEntity} showToast={showToast}/>}
