@@ -521,7 +521,71 @@ Responde SOLO con JSON sin texto extra:
       .map(([account,devices])=>({account,devices:[...devices],count:devices.size}))
       .sort((a,b)=>b.count-a.count);
 
-    return{suspiciousDevices,suspiciousIPs,sharedFPs,multiDeviceAccounts,totalRows:allRows.length,totalDevices:Object.keys(deviceToAccounts).length,totalAccounts:Object.keys(accountToDevices).length};
+    // ── Generar alertas automáticas ───────────────────────────────────────────
+    const alerts = [];
+    // Alerta por dispositivo compartido entre múltiples cuentas
+    suspiciousDevices.forEach(d => {
+      const severity = d.accounts.length >= 5 ? 'CRÍTICO' : d.accounts.length >= 3 ? 'ALTO' : 'MEDIO';
+      alerts.push({
+        id: 'DEV-' + d.device.slice(0,8).toUpperCase(),
+        type: 'DEVICE_SHARING',
+        title: 'Dispositivo compartido entre ' + d.accounts.length + ' cuentas',
+        detail: 'El dispositivo ' + d.device.slice(0,20) + '… fue usado por ' + d.accounts.length + ' identidades distintas.',
+        severity,
+        risk: d.risk,
+        accounts: d.accounts,
+        evidence: [
+          'Cuentas afectadas: ' + d.accounts.slice(0,3).join(', ') + (d.accounts.length>3?' y '+(d.accounts.length-3)+' más':''),
+          'IPs registradas: ' + d.ips.length,
+          'Sesiones: ' + d.sessions,
+          'Score de riesgo: ' + d.risk + '/999',
+        ],
+        device: d.device,
+        ips: d.ips,
+      });
+    });
+    // Alerta por IP compartida entre muchas cuentas
+    suspiciousIPs.filter(ip => ip.count >= 3).forEach(ip => {
+      alerts.push({
+        id: 'IP-' + ip.ip.replace(/\./g,'-'),
+        type: 'SHARED_IP',
+        title: 'IP compartida entre ' + ip.count + ' cuentas',
+        detail: 'La IP ' + ip.ip + ' fue usada para acceder a ' + ip.count + ' cuentas distintas — posible proxy/VPN de fraude.',
+        severity: ip.count >= 6 ? 'CRÍTICO' : ip.count >= 4 ? 'ALTO' : 'MEDIO',
+        risk: Math.min(999, ip.count * 120),
+        accounts: ip.accounts,
+        evidence: [
+          'IP: ' + ip.ip,
+          'Cuentas conectadas: ' + ip.count,
+          'Cuentas: ' + ip.accounts.slice(0,3).join(', ') + (ip.count>3?' y '+(ip.count-3)+' más':''),
+        ],
+        ip: ip.ip,
+      });
+    });
+    // Alerta por fingerprint duplicado
+    sharedFPs.forEach(fp => {
+      alerts.push({
+        id: 'FP-' + fp.fp.slice(0,8).toUpperCase(),
+        type: 'DUPLICATE_FINGERPRINT',
+        title: 'Fingerprint de dispositivo duplicado (' + fp.accounts.length + ' cuentas)',
+        detail: 'El mismo fingerprint de hardware fue detectado en ' + fp.accounts.length + ' cuentas. Indica acceso desde el mismo dispositivo físico.',
+        severity: fp.accounts.length >= 4 ? 'CRÍTICO' : 'ALTO',
+        risk: Math.min(999, fp.accounts.length * 180),
+        accounts: fp.accounts,
+        evidence: [
+          'Fingerprint: ' + fp.fp.slice(0,20) + '…',
+          'Cuentas con este fingerprint: ' + fp.accounts.length,
+          'Cuentas: ' + fp.accounts.slice(0,3).join(', '),
+        ],
+        fp: fp.fp,
+      });
+    });
+    // Ordenar por severidad
+    const sOrder = {'CRÍTICO':0,'ALTO':1,'MEDIO':2};
+    alerts.sort((a,b) => (sOrder[a.severity]||2) - (sOrder[b.severity]||2));
+
+    return{suspiciousDevices,suspiciousIPs,sharedFPs,multiDeviceAccounts,alerts,
+      totalRows:allRows.length,totalDevices:Object.keys(deviceToAccounts).length,totalAccounts:Object.keys(accountToDevices).length};
   };
 
   const processUpload=async()=>{
@@ -669,9 +733,48 @@ Responde SOLO con JSON sin texto extra:
 
       {/* RESULTADOS DISPOSITIVOS */}
       {result&&result.type==='device'&&(()=>{
-        const{suspiciousDevices,suspiciousIPs,sharedFPs,multiDeviceAccounts,totalRows,totalDevices,totalAccounts}=result;
+        const{suspiciousDevices,suspiciousIPs,sharedFPs,multiDeviceAccounts,alerts,totalRows,totalDevices,totalAccounts}=result;
+        const sevColor=(s)=>s==='CRÍTICO'?'var(--red)':s==='ALTO'?'var(--amber)':'var(--orange)';
+        const sevBg=(s)=>s==='CRÍTICO'?'rgba(255,59,92,.12)':s==='ALTO'?'rgba(245,158,11,.1)':'rgba(249,115,22,.08)';
         return(
           <div>
+            {/* ── PANEL DE ALERTAS ── */}
+            {alerts?.length>0&&(
+              <div style={{background:'rgba(255,59,92,.06)',border:'1px solid rgba(255,59,92,.25)',borderRadius:10,padding:'14px 18px',marginBottom:16}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+                  <div>
+                    <div style={{fontFamily:'var(--sans)',fontSize:16,fontWeight:700,color:'var(--white)'}}>🚨 {alerts.length} Alertas generadas</div>
+                    <div style={{fontSize:9,color:'var(--slate)',marginTop:2}}>Análisis de comportamiento de dispositivos — fraude detectado sin necesidad de transacciones financieras</div>
+                  </div>
+                  <div style={{display:'flex',gap:6}}>
+                    {['CRÍTICO','ALTO','MEDIO'].map(s=>{
+                      const n=alerts.filter(a=>a.severity===s).length;
+                      return n>0?<span key={s} style={{padding:'3px 10px',borderRadius:4,fontSize:9,fontWeight:700,background:sevBg(s),color:sevColor(s),border:`1px solid ${sevColor(s)}50`}}>{n} {s}</span>:null;
+                    })}
+                  </div>
+                </div>
+                {alerts.map((al,i)=>(
+                  <div key={i} style={{background:'var(--bg2)',borderRadius:8,padding:'10px 14px',marginBottom:6,borderLeft:`3px solid ${sevColor(al.severity)}`}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
+                      <div>
+                        <div style={{fontSize:11,color:'var(--white)',fontWeight:600,marginBottom:2}}>{al.title}</div>
+                        <div style={{fontSize:9,color:'var(--slate)'}}>{al.detail}</div>
+                      </div>
+                      <div style={{display:'flex',gap:6,alignItems:'center',flexShrink:0,marginLeft:12}}>
+                        <span style={{fontFamily:'var(--sans)',fontSize:18,fontWeight:800,color:sevColor(al.severity)}}>{al.risk}</span>
+                        <span style={{padding:'2px 8px',borderRadius:3,fontSize:8,fontWeight:700,background:sevBg(al.severity),color:sevColor(al.severity),border:`1px solid ${sevColor(al.severity)}60`}}>{al.severity}</span>
+                      </div>
+                    </div>
+                    <div style={{display:'flex',gap:4,flexWrap:'wrap',marginTop:6}}>
+                      {al.evidence?.map((ev,j)=>(
+                        <span key={j} style={{fontSize:8,padding:'2px 7px',background:'var(--bg3)',borderRadius:3,color:'var(--muted)',border:'1px solid var(--border)'}}>{ev}</span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className="grid-4" style={{marginBottom:14}}>
               {[['Sesiones analizadas',totalRows,'var(--muted)'],['Dispositivos únicos',totalDevices,'var(--light)'],['Cuentas únicas',totalAccounts,'var(--light)'],['Dispositivos comprometidos',suspiciousDevices.length,'var(--red)']].map(([l,v,c])=>(
                 <div className="card" key={l}><div className="card-title">{l}</div><div style={{fontFamily:'var(--sans)',fontSize:24,fontWeight:800,color:c}}>{v}</div></div>
