@@ -24,7 +24,6 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
     if db.query(User).filter(User.email == data.email).first():
         raise HTTPException(400, "Email ya registrado")
 
-    # Validar formato del código si se provee
     ec = (data.requested_entity_code or "").upper().strip().replace(" ", "_")
     en = (data.requested_entity_name or "").strip()
     if ec and not en:
@@ -106,7 +105,6 @@ def approve_user(
     if not ec:
         raise HTTPException(400, "El usuario no indicó una entidad al registrarse")
 
-    # Crear entidad si no existe
     entity = db.query(Entity).filter(Entity.code == ec).first()
     if not entity:
         entity = Entity(
@@ -120,9 +118,8 @@ def approve_user(
             weight_ml=0.6,
         )
         db.add(entity)
-        db.flush()  # para obtener entity.id
+        db.flush()
 
-    # Verificar que la entidad no tenga ya un analista aprobado
     existing = db.query(User).filter(
         User.entity_code == ec,
         User.status == "APPROVED",
@@ -175,7 +172,7 @@ def delete_user(
 
 @router.post("/admin/setup-superadmin")
 def setup_superadmin(data: RegisterRequest, db: Session = Depends(get_db)):
-    """Solo funciona si no hay ningún superadmin todavía"""
+    """Solo funciona si no hay ningun superadmin todavia"""
     if db.query(User).filter(User.role == "superadmin").first():
         raise HTTPException(400, "Ya existe un superadmin. Usa /login.")
     user = User(
@@ -191,8 +188,57 @@ def setup_superadmin(data: RegisterRequest, db: Session = Depends(get_db)):
 
 
 # ══════════════════════════════════════════════════════════════
-#  UPLOAD MASIVO DE TRANSACCIONES (Excel .xlsx)
+#  HELPERS DE PARSEO
 # ══════════════════════════════════════════════════════════════
+
+def _detect_separator(line: str) -> str:
+    """Detecta el separador: tab, punto y coma, o coma."""
+    if "\t" in line:
+        return "\t"
+    if ";" in line:
+        return ";"
+    return ","
+
+def _parse_csv_content(contents: bytes) -> list:
+    """Parsea CSV/TSV/TXT en lista de listas. Intenta UTF-8 luego latin-1."""
+    import csv as _csv
+    text = None
+    for enc in ("utf-8-sig", "utf-8", "latin-1"):
+        try:
+            text = contents.decode(enc)
+            break
+        except Exception:
+            continue
+    if text is None:
+        raise ValueError("No se pudo decodificar el archivo de texto")
+
+    lines = [l for l in text.splitlines() if l.strip()]
+    if not lines:
+        return []
+
+    sep = _detect_separator(lines[0])
+    reader = _csv.reader(lines, delimiter=sep)
+    return list(reader)
+
+def _parse_xlsx_content(contents: bytes) -> list:
+    """Parsea xlsx/xls en lista de listas usando openpyxl."""
+    try:
+        import openpyxl
+    except ImportError:
+        raise HTTPException(500, "openpyxl no instalado")
+    wb = openpyxl.load_workbook(io.BytesIO(contents), data_only=True)
+    ws = wb.active
+    rows = []
+    for row in ws.iter_rows():
+        rows.append([cell.value for cell in row])
+    return rows
+
+
+# ══════════════════════════════════════════════════════════════
+#  UPLOAD MASIVO — acepta xlsx, xls, csv, tsv, txt
+# ══════════════════════════════════════════════════════════════
+
+ACCEPTED_EXTENSIONS = (".xlsx", ".xls", ".csv", ".tsv", ".txt", ".ods")
 
 @router.post("/upload")
 async def upload_transactions(
@@ -202,16 +248,21 @@ async def upload_transactions(
     db: Session = Depends(get_db)
 ):
     """
-    Carga masiva con mapeo dinámico de columnas (detectado por IA en el frontend).
+    Carga masiva con mapeo dinamico de columnas (detectado por IA en el frontend).
+    Acepta: .xlsx, .xls, .csv, .tsv, .txt
     mapping: JSON string {"amount":"col_excel","channel":"col_excel",...}
     """
-    try:
-        import openpyxl, json as _json
-    except ImportError:
-        raise HTTPException(500, "openpyxl no instalado")
+    import json as _json
 
-    if not file.filename.lower().endswith((".xlsx", ".xls")):
-        raise HTTPException(400, "Solo se aceptan .xlsx / .xls")
+    fname = (file.filename or "").lower()
+    is_csv  = fname.endswith((".csv", ".tsv", ".txt"))
+    is_xlsx = fname.endswith((".xlsx", ".xls", ".ods"))
+
+    if not (is_csv or is_xlsx):
+        raise HTTPException(
+            400,
+            f"Formato no soportado '{fname}'. Acepta: {', '.join(ACCEPTED_EXTENSIONS)}"
+        )
 
     entity_code = current_user.entity_code
     if not entity_code and current_user.role != "superadmin":
@@ -225,23 +276,34 @@ async def upload_transactions(
             col_map = {}
 
     contents = await file.read()
+
+    # Parsear archivo
     try:
-        wb = openpyxl.load_workbook(io.BytesIO(contents), data_only=True)
-        ws = wb.active
+        if is_csv:
+            all_rows = _parse_csv_content(contents)
+        else:
+            all_rows = _parse_xlsx_content(contents)
     except Exception as e:
         raise HTTPException(400, f"No se pudo leer el archivo: {str(e)}")
 
-    raw_headers = [str(cell.value or "").strip() for cell in ws[1]]
+    if not all_rows:
+        raise HTTPException(400, "El archivo esta vacio")
+
+    # Primera fila = encabezados
+    raw_headers   = [str(h or "").strip() for h in all_rows[0]]
     headers_lower = [h.lower() for h in raw_headers]
+    data_rows     = all_rows[1:]
 
     def get_col(row, field_name):
+        # 1) Mapeo explicito del frontend
         if field_name in col_map and col_map[field_name]:
             mapped_col = col_map[field_name]
             try:
                 idx = raw_headers.index(mapped_col)
-                return row[idx].value
-            except (ValueError, IndexError):
+                return row[idx] if idx < len(row) else None
+            except ValueError:
                 pass
+        # 2) Fallback por alias
         aliases = {
             "amount":         ["amount","monto","valor","importe","total","cantidad"],
             "channel":        ["channel","canal","tipo","type","medio"],
@@ -256,22 +318,25 @@ async def upload_transactions(
         for alias in aliases.get(field_name, [field_name]):
             try:
                 idx = headers_lower.index(alias.lower())
-                return row[idx].value
+                return row[idx] if idx < len(row) else None
             except ValueError:
                 pass
         return None
 
-    VALID_CHANNELS = {"CARD","TRANSFER","ATM","WALLET","DIGITAL_BANKING"}
+    VALID_CHANNELS = {"CARD", "TRANSFER", "ATM", "WALLET", "DIGITAL_BANKING"}
     CH_ALIASES = {
-        "BANCA_DIGITAL":"DIGITAL_BANKING","ONLINE":"DIGITAL_BANKING","INTERNET":"DIGITAL_BANKING",
-        "WEB":"DIGITAL_BANKING","APP":"DIGITAL_BANKING","MOBILE":"DIGITAL_BANKING",
-        "TRANSFERENCIA":"TRANSFER","TARJETA":"CARD","CAJERO":"ATM","BILLETERA":"WALLET",
+        "BANCA_DIGITAL": "DIGITAL_BANKING", "ONLINE": "DIGITAL_BANKING",
+        "INTERNET": "DIGITAL_BANKING", "WEB": "DIGITAL_BANKING",
+        "APP": "DIGITAL_BANKING", "MOBILE": "DIGITAL_BANKING",
+        "TRANSFERENCIA": "TRANSFER", "TARJETA": "CARD",
+        "CAJERO": "ATM", "BILLETERA": "WALLET",
     }
 
     results, errors, saved = [], [], 0
 
-    for i, row in enumerate(ws.iter_rows(min_row=2), start=2):
-        if all(c.value is None for c in row):
+    for i, row in enumerate(data_rows, start=2):
+        # Saltar filas vacias
+        if not row or all(str(c or "").strip() == "" for c in row):
             continue
 
         raw_amount  = get_col(row, "amount")
@@ -287,15 +352,18 @@ async def upload_transactions(
         tx_id = str(tx_id_raw or "").strip() or f"UP-{uuid.uuid4().hex[:8].upper()}"
 
         row_errors = []
+
+        # Validar amount
         try:
             amount_str = str(raw_amount or "").replace(",", ".").strip()
             amount = float(amount_str)
             if amount <= 0:
                 row_errors.append("amount debe ser > 0")
         except Exception:
-            row_errors.append(f"amount inválido: '{raw_amount}'")
+            row_errors.append(f"amount invalido: '{raw_amount}'")
             amount = 0
 
+        # Validar channel
         channel = CH_ALIASES.get(channel_raw, channel_raw)
         if channel not in VALID_CHANNELS:
             for vc in VALID_CHANNELS:
@@ -303,7 +371,10 @@ async def upload_transactions(
                     channel = vc
                     break
             else:
-                row_errors.append(f"channel '{channel_raw}' inválido. Usa: CARD, TRANSFER, ATM, WALLET, DIGITAL_BANKING")
+                row_errors.append(
+                    f"channel '{channel_raw}' invalido. "
+                    f"Usa: CARD, TRANSFER, ATM, WALLET, DIGITAL_BANKING"
+                )
 
         if not cardholder:
             row_errors.append("cardholder (titular) requerido")
@@ -314,16 +385,19 @@ async def upload_transactions(
             errors.append({"row": i, "tx_id": tx_id, "errors": row_errors})
             continue
 
+        # Parsear fecha
         tx_dt = datetime.utcnow()
         if isinstance(dt_raw, datetime):
             tx_dt = dt_raw
         elif dt_raw:
             raw_str = str(dt_raw).strip().replace(" ", "T")
-            # Intentar múltiples formatos, ignorar años imposibles
             for fmt in [None, "%Y-%m-%dT%H:%M", "%Y-%m-%d", "%d/%m/%Y %H:%M", "%d/%m/%Y"]:
                 try:
-                    parsed = datetime.fromisoformat(raw_str) if fmt is None else datetime.strptime(str(dt_raw).strip(), fmt)
-                    # Validar que el año sea razonable (1990-2100)
+                    parsed = (
+                        datetime.fromisoformat(raw_str)
+                        if fmt is None
+                        else datetime.strptime(str(dt_raw).strip(), fmt)
+                    )
                     if 1990 <= parsed.year <= 2100:
                         tx_dt = parsed
                         break
@@ -346,15 +420,19 @@ async def upload_transactions(
         results.append(payload)
 
     if not results and errors:
-        return {"status":"error","message":"No se procesó ninguna fila válida",
-                "total":len(errors),"saved":0,"errors":len(errors),"error_detail":errors[:20],"scored":[]}
+        return {
+            "status": "error",
+            "message": "No se proceso ninguna fila valida",
+            "total": len(errors), "saved": 0,
+            "errors": len(errors), "error_detail": errors[:20], "scored": []
+        }
 
     from main import score_transaction_internal
     from models import TransactionRecord
+
     scored = []
     for payload in results:
         try:
-            # Si el tx_id ya existe en la BD, generar uno nuevo automáticamente
             existing = db.query(TransactionRecord).filter(
                 TransactionRecord.tx_id == payload["tx_id"]
             ).first()
@@ -362,24 +440,21 @@ async def upload_transactions(
                 payload["tx_id"] = payload["tx_id"] + "-" + uuid.uuid4().hex[:6].upper()
 
             result = score_transaction_internal(payload, db)
-            # score_transaction_internal devuelve claves en el root (no anidadas en "scoring")
             scored.append({
                 "tx_id":    payload["tx_id"],
                 "amount":   payload["amount"],
                 "channel":  payload["channel"],
-                "score":    result.get("score_final", result.get("scoring", {}).get("score_final", 0)),
-                "decision": result.get("decision",   result.get("scoring", {}).get("decision",   "APROBADA")),
-                "risk":     result.get("risk_level",  result.get("scoring", {}).get("risk_level",  "LOW")),
+                "score":    result.get("score_final",  result.get("scoring", {}).get("score_final", 0)),
+                "decision": result.get("decision",     result.get("scoring", {}).get("decision",   "APROBADA")),
+                "risk":     result.get("risk_level",   result.get("scoring", {}).get("risk_level",  "LOW")),
             })
             saved += 1
         except Exception as e:
-            # Rollback de la sesión para que las siguientes filas no fallen en cascada
             try:
                 db.rollback()
             except Exception:
                 pass
             err_msg = str(e)
-            # Simplificar mensaje de error de duplicado
             if "UNIQUE constraint failed" in err_msg or "unique constraint" in err_msg.lower():
                 err_msg = f"tx_id '{payload['tx_id']}' duplicado — ya existe en la base de datos"
             errors.append({"tx_id": payload["tx_id"], "errors": [err_msg]})
@@ -394,27 +469,28 @@ async def upload_transactions(
     }
 
 
-# ── DESCARGAR PLANTILLA EXCEL ──────────────────────────────────
+# ── DESCARGAR PLANTILLA ───────────────────────────────────────
 
 @router.get("/upload/template")
 def download_template():
-    """Devuelve una URL de ejemplo y la estructura esperada del Excel"""
     return {
         "columns": [
-            {"name": "tx_id",           "type": "texto",   "required": True,  "example": "TXN-001",         "description": "ID único de la transacción"},
-            {"name": "amount",          "type": "número",  "required": True,  "example": "1500.00",         "description": "Monto en USD"},
-            {"name": "channel",         "type": "texto",   "required": True,  "example": "CARD",            "description": "CARD | TRANSFER | ATM | WALLET | DIGITAL_BANKING"},
-            {"name": "cardholder",      "type": "texto",   "required": True,  "example": "Juan Pérez",      "description": "Nombre del titular"},
-            {"name": "city",            "type": "texto",   "required": True,  "example": "Guayaquil",       "description": "Ciudad de la transacción"},
-            {"name": "datetime",        "type": "fecha",   "required": True,  "example": "2024-01-15 14:30","description": "Fecha y hora (YYYY-MM-DD HH:MM)"},
-            {"name": "account_number",  "type": "texto",   "required": True,  "example": "ACC1001",         "description": "Cuenta o tarjeta origen"},
-            {"name": "dest_account",    "type": "texto",   "required": False, "example": "ACC2002",         "description": "Cuenta destino (solo TRANSFER)"},
-            {"name": "dest_name",       "type": "texto",   "required": False, "example": "María García",    "description": "Nombre destino (solo TRANSFER)"},
+            {"name": "tx_id",           "type": "texto",  "required": True,  "example": "TXN-001",          "description": "ID unico de la transaccion"},
+            {"name": "amount",          "type": "numero", "required": True,  "example": "1500.00",          "description": "Monto en USD"},
+            {"name": "channel",         "type": "texto",  "required": True,  "example": "CARD",             "description": "CARD | TRANSFER | ATM | WALLET | DIGITAL_BANKING"},
+            {"name": "cardholder",      "type": "texto",  "required": True,  "example": "Juan Perez",       "description": "Nombre del titular"},
+            {"name": "city",            "type": "texto",  "required": True,  "example": "Guayaquil",        "description": "Ciudad de la transaccion"},
+            {"name": "datetime",        "type": "fecha",  "required": True,  "example": "2024-01-15 14:30", "description": "Fecha y hora (YYYY-MM-DD HH:MM)"},
+            {"name": "account_number",  "type": "texto",  "required": True,  "example": "ACC1001",          "description": "Cuenta o tarjeta origen"},
+            {"name": "dest_account",    "type": "texto",  "required": False, "example": "ACC2002",          "description": "Cuenta destino (solo TRANSFER)"},
+            {"name": "dest_name",       "type": "texto",  "required": False, "example": "Maria Garcia",     "description": "Nombre destino (solo TRANSFER)"},
         ],
         "notes": [
-            "Las columnas dest_account y dest_name solo son necesarias para transacciones de tipo TRANSFER",
-            "El campo tx_id debe ser único por entidad",
-            "El campo channel acepta: CARD, TRANSFER, ATM, WALLET, DIGITAL_BANKING. El sistema también reconoce aliases como BANCA_DIGITAL, ONLINE, APP, etc.",
-            "Las fechas deben estar en formato YYYY-MM-DD HH:MM o YYYY-MM-DDTHH:MM:SS",
+            "Formatos aceptados: .xlsx, .xls, .csv, .tsv, .txt",
+            "Para CSV/TSV el sistema detecta automaticamente el separador (coma, punto y coma, o tab)",
+            "Las columnas dest_account y dest_name solo son necesarias para transacciones TRANSFER",
+            "El campo tx_id debe ser unico por entidad",
+            "El campo channel acepta aliases: BANCA_DIGITAL, ONLINE, APP, TRANSFERENCIA, TARJETA, CAJERO, BILLETERA",
+            "Las fechas aceptan: YYYY-MM-DD HH:MM, YYYY-MM-DDTHH:MM:SS, DD/MM/YYYY",
         ]
     }
