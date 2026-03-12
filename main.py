@@ -207,6 +207,8 @@ def list_transactions(
     channel:     Optional[str] = None,
     decision:    Optional[str] = None,
     risk_level:  Optional[str] = None,
+    profile_id:  Optional[int] = None,
+    days:        Optional[int] = None,
     min_score:   int = 0,
     limit:  int = Query(50,  ge=1, le=500),
     offset: int = 0,
@@ -216,10 +218,15 @@ def list_transactions(
     if entity_code:
         e = db.query(Entity).filter(Entity.code == entity_code).first()
         if e: q = q.filter(TransactionRecord.entity_id == e.id)
-    if channel:    q = q.filter(TransactionRecord.channel    == channel.upper())
+    if channel and channel != "ALL":
+        q = q.filter(TransactionRecord.channel == channel.upper())
     if decision:   q = q.filter(TransactionRecord.decision   == decision.upper())
     if risk_level: q = q.filter(TransactionRecord.risk_level == risk_level.upper())
     if min_score:  q = q.filter(TransactionRecord.score_final >= min_score)
+    if profile_id: q = q.filter(TransactionRecord.profile_id == profile_id)
+    if days:
+        cutoff = datetime.utcnow() - timedelta(days=days)
+        q = q.filter(TransactionRecord.created_at >= cutoff)
     total = q.count()
     rows  = q.order_by(desc(TransactionRecord.created_at)).offset(offset).limit(limit).all()
     return {"total": total, "offset": offset, "limit": limit, "data": [r.to_dict() for r in rows]}
@@ -290,6 +297,8 @@ def list_alerts(
     entity_code: Optional[str] = None,
     status:      str = Query("PENDING"),
     risk_level:  Optional[str] = None,
+    channel:     Optional[str] = None,
+    days:        Optional[int] = None,
     limit:  int = Query(50, ge=1, le=500),
     offset: int = 0,
     db: Session = Depends(get_db),
@@ -305,6 +314,11 @@ def list_alerts(
         q = q.filter(Alert.status == status)
     if risk_level:
         q = q.filter(Alert.risk_level == risk_level.upper())
+    if channel and channel != "ALL":
+        q = q.filter(Alert.channel == channel.upper())
+    if days:
+        cutoff = datetime.utcnow() - timedelta(days=days)
+        q = q.filter(Alert.created_at >= cutoff)
     total = q.count()
     rows  = q.order_by(desc(Alert.created_at)).offset(offset).limit(limit).all()
     return {"total": total, "data": [a.to_dict() for a in rows]}
