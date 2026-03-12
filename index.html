@@ -1468,27 +1468,43 @@ function UploadPage({entity, showToast, onDeviceResult}) {
 
   const readFile=(f)=>{
     setFile(f);setResult(null);setMapping({});setMappingConfirmed(false);setFileType(null);
+    const name=f.name.toLowerCase();
+    const isCsv=name.endsWith('.csv')||name.endsWith('.tsv')||name.endsWith('.txt');
     const reader=new FileReader();
     reader.onload=async(ev)=>{
       try{
-        const wb=XLSX.read(ev.target.result,{type:'binary'});
-        const ws=wb.Sheets[wb.SheetNames[0]];
-        const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+        let rows=[];
+        if(isCsv){
+          // Parsear CSV/TSV — detectar separador automáticamente
+          const text=ev.target.result;
+          const lines=text.split(/\r?\n/).filter(l=>l.trim());
+          if(!lines.length){showToast('Archivo vacío','err');return;}
+          // Detectar separador: tab, punto y coma, o coma
+          const sample=lines[0];
+          const sep=sample.includes('\t')?'\t':sample.includes(';')?';':',';
+          rows=lines.map(l=>l.split(sep).map(c=>c.replace(/^"+|"+$/g,'').trim()));
+        }else{
+          // xlsx / xls
+          const wb=XLSX.read(ev.target.result,{type:'binary'});
+          const ws=wb.Sheets[wb.SheetNames[0]];
+          rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+        }
         if(!rows.length){showToast('Archivo vacío','err');return;}
         const hdrs=rows[0].map(h=>String(h||'').trim());
         setHeaders(hdrs);
         setRawData(rows.slice(1,6));
-        setAllRows(rows.slice(1).filter(r=>r.some(c=>c)));
+        setAllRows(rows.slice(1).filter(r=>r.some(c=>String(c).trim())));
         setAiAnalyzing(true);
         await aiDetectMapping(hdrs,rows.slice(1,4));
       }catch(e){showToast('Error leyendo archivo: '+e.message,'err');}
     };
-    reader.readAsBinaryString(f);
+    if(isCsv) reader.readAsText(f,'UTF-8');
+    else reader.readAsBinaryString(f);
   };
 
   const aiDetectMapping=async(hdrs,sampleRows)=>{
     try{
-      const prompt='Archivo Excel con columnas: '+JSON.stringify(hdrs)+'\nFilas de muestra: '+JSON.stringify(sampleRows.slice(0,2))+'\n\nDetermina si este archivo es TRANSACCIONAL (tiene montos, canales de pago) o de DISPOSITIVOS/SESIONES (tiene device_id, fingerprints, IPs).\n\nResponde SOLO con JSON sin texto adicional:\n{"type":"transactional"|"device","mapping":{"campo_sistema":"columna_excel",...}}';
+      const prompt='Archivo tabular con columnas: '+JSON.stringify(hdrs)+'\nFilas de muestra: '+JSON.stringify(sampleRows.slice(0,2))+'\n\nDetermina si este archivo es TRANSACCIONAL (tiene montos, canales de pago) o de DISPOSITIVOS/SESIONES (tiene device_id, fingerprints, IPs).\n\nResponde SOLO con JSON sin texto adicional:\n{"type":"transactional"|"device","mapping":{"campo_sistema":"columna_excel",...}}';
       const resp=await fetch('https://api.anthropic.com/v1/messages',{
         method:'POST',
         headers:{'Content-Type':'application/json'},
@@ -1653,9 +1669,9 @@ function UploadPage({entity, showToast, onDeviceResult}) {
             style={{marginTop:12,border:'2px dashed var(--border2)',borderRadius:10,padding:'48px 24px',textAlign:'center',cursor:'pointer',transition:'all .2s'}}
             onMouseEnter={e=>e.currentTarget.style.borderColor='var(--teal)'} onMouseLeave={e=>e.currentTarget.style.borderColor='var(--border2)'}>
             <div style={{fontSize:48,marginBottom:12}}>📂</div>
-            <div style={{fontSize:13,color:'var(--light)',fontWeight:600,marginBottom:6}}>Cualquier archivo Excel (.xlsx)</div>
-            <div style={{fontSize:10,color:'var(--slate)'}}>La IA detecta automaticamente si es transaccional o de dispositivos</div>
-            <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{display:'none'}} onChange={e=>{const f=e.target.files[0];if(f)readFile(f);}}/>
+            <div style={{fontSize:13,color:'var(--light)',fontWeight:600,marginBottom:6}}>Excel, CSV, TSV o cualquier formato tabular</div>
+            <div style={{fontSize:10,color:'var(--slate)'}}>La IA detecta el tipo de datos y las columnas automaticamente</div>
+            <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv,.tsv,.txt,.ods" style={{display:'none'}} onChange={e=>{const f=e.target.files[0];if(f)readFile(f);}}/>
           </div>
           <div style={{marginTop:16,display:'flex',gap:8,flexWrap:'wrap'}}>
             {[['💳 Transaccional','montos, canales, titulares — score de fraude'],['📱 Dispositivos/Sesiones','device_id, IPs, fingerprints — deteccion de compromiso']].map(([t,d])=>(
