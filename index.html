@@ -385,7 +385,7 @@ function Profiles({entity,channel,showToast}){
 }
 
 /* ══════════ UPLOAD CON IA ══════════ */
-function UploadPage({entity,showToast}){
+function UploadPage({entity,showToast,onDeviceResult}){
   const [file,setFile]=useState(null);const [rawData,setRawData]=useState(null);const [allRows,setAllRows]=useState([]);const [headers,setHeaders]=useState([]);const [mapping,setMapping]=useState({});const [mappingConfirmed,setMappingConfirmed]=useState(false);const [aiAnalyzing,setAiAnalyzing]=useState(false);const [uploading,setUploading]=useState(false);const [result,setResult]=useState(null);const [fileType,setFileType]=useState(null); // 'transactional' | 'device'
   const fileRef=useRef();
 
@@ -532,7 +532,8 @@ Responde SOLO con JSON sin texto extra:
         const r=analyzeDevices();
         setResult({type:'device',...r});
         setUploading(false);
-        showToast(`✅ ${r.suspiciousDevices.length} dispositivos sospechosos detectados`,'ok');
+        if(onDeviceResult)onDeviceResult(r);
+        showToast(`✅ ${r.suspiciousDevices.length} dispositivos sospechosos detectados — ve a Red de Riesgo`,'ok');
       },400);
       return;
     }
@@ -768,117 +769,300 @@ Responde SOLO con JSON sin texto extra:
 }
 
 /* ══════════ GRAFO DE RED ══════════ */
-function NetworkGraph({entity,channel,showToast}){
-  const [nodes,setNodes]=useState([]);const [edges,setEdges]=useState([]);const [loading,setLoad]=useState(true);const [selected,setSelected]=useState(null);const svgRef=useRef();const [dims,setDims]=useState({w:800,h:500});
-  useEffect(()=>{
-    const update=()=>{if(svgRef.current){const r=svgRef.current.getBoundingClientRect();setDims({w:r.width,h:r.height});}};
-    update();window.addEventListener('resize',update);return()=>window.removeEventListener('resize',update);
-  },[]);
-  useEffect(()=>{
-    const load=async()=>{
-      setLoad(true);
-      try{
-        const chParam=channel&&channel!=='ALL'?`&channel=${channel}`:'';
-        const d=await api(`/api/v2/profiles?limit=80${entity?`&entity_code=${entity}`:''}${chParam}`);
-        const ps=d.profiles||[];
-        // Construir grafo desde perfiles y transacciones
-        const ns=ps.map((p,i)=>({
-          id:p.id,label:p.identity_value.slice(0,8)+'…',
-          risk:p.risk.risk_label,score:p.risk.score_max_ever,
-          tx:p.velocity.tx_30d,fraud:p.risk.fraud_confirmed,
-          x:dims.w*0.1+Math.random()*(dims.w*0.8),
-          y:dims.h*0.1+Math.random()*(dims.h*0.8),
-        }));
-        // Crear aristas entre nodos de alto riesgo cercanos (simulado por ciudades)
-        const es=[];
-        for(let i=0;i<ns.length;i++){
-          for(let j=i+1;j<ns.length;j++){
-            if(ns[i].fraud>0&&ns[j].fraud>0&&Math.random()<0.3){
-              es.push({from:ns[i].id,to:ns[j].id,weight:1});
-            }else if(ns[i].score>600&&ns[j].score>600&&Math.random()<0.15){
-              es.push({from:ns[i].id,to:ns[j].id,weight:0.5});
-            }
-          }
-        }
-        setNodes(ns);setEdges(es);
-      }catch(e){showToast('Error cargando red','err');}
-      setLoad(false);
-    };
-    if(dims.w>100)load();
-  },[entity,channel,dims.w]);
+function forceLayout(ns,es,w,h,iters=120){
+  let nodes=[...ns.map(n=>({...n}))];
+  for(let iter=0;iter<iters;iter++){
+    for(let i=0;i<nodes.length;i++){
+      for(let j=i+1;j<nodes.length;j++){
+        const dx=nodes[j].x-nodes[i].x,dy=nodes[j].y-nodes[i].y;
+        const dist=Math.sqrt(dx*dx+dy*dy)||1;
+        const f=Math.min(4000/(dist*dist),8);
+        nodes[i].x-=dx/dist*f;nodes[i].y-=dy/dist*f;
+        nodes[j].x+=dx/dist*f;nodes[j].y+=dy/dist*f;
+      }
+    }
+    es.forEach(e=>{
+      const a=nodes.find(n=>n.id===e.from),b=nodes.find(n=>n.id===e.to);
+      if(!a||!b)return;
+      const dx=b.x-a.x,dy=b.y-a.y,dist=Math.sqrt(dx*dx+dy*dy)||1;
+      const f=dist*0.015*(e.weight||1);
+      a.x+=dx/dist*f;a.y+=dy/dist*f;
+      b.x-=dx/dist*f;b.y-=dy/dist*f;
+    });
+    nodes=nodes.map(n=>({...n,x:Math.max(40,Math.min(w-40,n.x)),y:Math.max(40,Math.min(h-40,n.y))}));
+  }
+  return nodes;
+}
 
-  // Force-directed layout simple
+function NetworkGraph({entity,channel,showToast,deviceResult}){
+  const [nodes,setNodes]=useState([]);
+  const [edges,setEdges]=useState([]);
+  const [loading,setLoad]=useState(true);
+  const [selected,setSelected]=useState(null);
+  const [mode,setMode]=useState(deviceResult?'device':'api'); // 'api' | 'device'
+  const [viewMode,setViewMode]=useState('devices'); // 'devices'|'accounts'|'ips'
+  const svgRef=useRef();
+  const [dims,setDims]=useState({w:800,h:500});
+
   useEffect(()=>{
-    if(!nodes.length)return;
-    let ns=[...nodes];
-    for(let iter=0;iter<80;iter++){
-      // repulsion
+    const update=()=>{if(svgRef.current){const r=svgRef.current.getBoundingClientRect();setDims({w:r.width||800,h:r.height||500});}};
+    const t=setTimeout(update,100);
+    window.addEventListener('resize',update);
+    return()=>{clearTimeout(t);window.removeEventListener('resize',update);};
+  },[]);
+
+  // Cuando llega deviceResult del upload, cambiar a modo device automáticamente
+  useEffect(()=>{if(deviceResult){setMode('device');setSelected(null);};},[deviceResult]);
+
+  // Construir grafo desde deviceResult
+  const buildDeviceGraph=useCallback((dr,vm,w,h)=>{
+    if(!dr||!w)return;
+    setLoad(true);
+    const{suspiciousDevices,suspiciousIPs,multiDeviceAccounts}=dr;
+
+    if(vm==='devices'){
+      // Nodos = dispositivos sospechosos, aristas = cuentas compartidas
+      const ns=suspiciousDevices.slice(0,60).map((d,i)=>({
+        id:'dev_'+i,
+        label:d.device.slice(0,10)+'…',
+        fullLabel:d.device,
+        risk:d.level==='CRÍTICO'?'FRAUD':d.level==='ALTO'?'RISKY':'MEDIUM',
+        score:d.risk,
+        accounts:d.accounts,
+        ips:d.ips,
+        sessions:d.sessions,
+        type:'device',
+        x:w*0.1+Math.random()*(w*0.8),
+        y:h*0.1+Math.random()*(h*0.8),
+      }));
+      const es=[];
       for(let i=0;i<ns.length;i++){
         for(let j=i+1;j<ns.length;j++){
-          const dx=ns[j].x-ns[i].x,dy=ns[j].y-ns[i].y;
-          const dist=Math.sqrt(dx*dx+dy*dy)||1;
-          const f=600/(dist*dist);
-          ns[i].x-=dx/dist*f;ns[i].y-=dy/dist*f;
-          ns[j].x+=dx/dist*f;ns[j].y+=dy/dist*f;
+          const shared=ns[i].accounts.filter(a=>ns[j].accounts.includes(a));
+          if(shared.length>0)es.push({from:ns[i].id,to:ns[j].id,weight:shared.length,label:shared.length+' ctas'});
         }
       }
-      // attraction along edges
-      edges.forEach(e=>{
-        const a=ns.find(n=>n.id===e.from),b=ns.find(n=>n.id===e.to);
-        if(!a||!b)return;
-        const dx=b.x-a.x,dy=b.y-a.y,dist=Math.sqrt(dx*dx+dy*dy)||1;
-        const f=dist*0.01*e.weight;
-        a.x+=dx/dist*f;a.y+=dy/dist*f;
-        b.x-=dx/dist*f;b.y-=dy/dist*f;
+      const laid=forceLayout(ns,es,w,h);
+      setNodes(laid);setEdges(es);
+    } else if(vm==='accounts'){
+      // Nodos = cuentas, aristas = dispositivos compartidos
+      const allAccs=[...new Set(suspiciousDevices.flatMap(d=>d.accounts))].slice(0,80);
+      const ns=allAccs.map((acc,i)=>{
+        const devs=suspiciousDevices.filter(d=>d.accounts.includes(acc));
+        const maxRisk=Math.max(...devs.map(d=>d.risk),0);
+        return{id:'acc_'+i,label:acc.slice(0,10)+'…',fullLabel:acc,risk:maxRisk>=700?'FRAUD':maxRisk>=500?'RISKY':'MEDIUM',score:maxRisk,devices:devs.length,type:'account',x:w*0.1+Math.random()*(w*0.8),y:h*0.1+Math.random()*(h*0.8)};
       });
-      // bounds
-      ns=ns.map(n=>({...n,x:Math.max(30,Math.min(dims.w-30,n.x)),y:Math.max(30,Math.min(dims.h-30,n.y))}));
+      const es=[];
+      for(let i=0;i<ns.length;i++){
+        for(let j=i+1;j<ns.length;j++){
+          const devA=suspiciousDevices.filter(d=>d.accounts.includes(allAccs[i]));
+          const devB=suspiciousDevices.filter(d=>d.accounts.includes(allAccs[j]));
+          const sharedDevs=devA.filter(d=>devB.find(d2=>d2.device===d.device));
+          if(sharedDevs.length>0)es.push({from:ns[i].id,to:ns[j].id,weight:sharedDevs.length});
+        }
+      }
+      const laid=forceLayout(ns,es,w,h);
+      setNodes(laid);setEdges(es);
+    } else if(vm==='ips'){
+      // Nodos = IPs sospechosas
+      const topIPs=suspiciousIPs.slice(0,60);
+      const ns=topIPs.map((ip,i)=>({
+        id:'ip_'+i,label:ip.ip,fullLabel:ip.ip,
+        risk:ip.count>=5?'FRAUD':ip.count>=3?'RISKY':'MEDIUM',
+        score:Math.min(999,ip.count*120),
+        accounts:ip.accounts,count:ip.count,type:'ip',
+        x:w*0.1+Math.random()*(w*0.8),y:h*0.1+Math.random()*(h*0.8),
+      }));
+      const es=[];
+      for(let i=0;i<ns.length;i++){
+        for(let j=i+1;j<ns.length;j++){
+          const shared=ns[i].accounts.filter(a=>ns[j].accounts.includes(a));
+          if(shared.length>0)es.push({from:ns[i].id,to:ns[j].id,weight:shared.length});
+        }
+      }
+      const laid=forceLayout(ns,es,w,h,80);
+      setNodes(laid);setEdges(es);
     }
-    setNodes(ns);
-  },[edges]);
+    setLoad(false);
+  },[]);
 
-  const riskNodeColor=(r,s)=>{if(r==='FRAUD'||s>=800)return'#ff3b5c';if(r==='RISKY'||s>=600)return'#f59e0b';if(r==='UNKNOWN')return'#6b7280';return'#14b8a6';};
+  // Cargar desde API (modo normal)
+  const loadFromApi=useCallback(async(w,h)=>{
+    setLoad(true);
+    try{
+      const chParam=channel&&channel!=='ALL'?`&channel=${channel}`:'';
+      const d=await api(`/api/v2/profiles?limit=80${entity?`&entity_code=${entity}`:''}${chParam}`);
+      const ps=d.profiles||[];
+      const ns=ps.map(p=>({
+        id:p.id,label:p.identity_value.slice(0,8)+'…',fullLabel:p.identity_value,
+        risk:p.risk.risk_label,score:p.risk.score_max_ever,
+        tx:p.velocity.tx_30d,fraud:p.risk.fraud_confirmed,type:'profile',
+        x:w*0.1+Math.random()*(w*0.8),y:h*0.1+Math.random()*(h*0.8),
+      }));
+      const es=[];
+      for(let i=0;i<ns.length;i++){
+        for(let j=i+1;j<ns.length;j++){
+          if(ns[i].fraud>0&&ns[j].fraud>0&&Math.random()<0.3)es.push({from:ns[i].id,to:ns[j].id,weight:1});
+          else if(ns[i].score>600&&ns[j].score>600&&Math.random()<0.15)es.push({from:ns[i].id,to:ns[j].id,weight:0.5});
+        }
+      }
+      const laid=forceLayout(ns,es,w,h);
+      setNodes(laid);setEdges(es);
+    }catch(e){showToast('Error cargando red','err');}
+    setLoad(false);
+  },[entity,channel]);
+
+  useEffect(()=>{
+    if(!dims.w||dims.w<100)return;
+    setSelected(null);
+    if(mode==='device'&&deviceResult){
+      buildDeviceGraph(deviceResult,viewMode,dims.w,dims.h);
+    } else {
+      loadFromApi(dims.w,dims.h);
+    }
+  },[mode,viewMode,dims.w,deviceResult]);
+
+  const riskNodeColor=(r,s)=>{
+    if(r==='FRAUD'||s>=700)return'#ff3b5c';
+    if(r==='RISKY'||r==='MEDIUM'||s>=400)return'#f59e0b';
+    if(r==='UNKNOWN')return'#6b7280';
+    return'#14b8a6';
+  };
+  const nodeRadius=(n)=>{
+    if(n.type==='ip')return Math.min(6+n.count*2,18);
+    if(n.type==='device')return n.score>=700?16:n.score>=500?12:8;
+    if(n.type==='account')return n.devices>2?14:10;
+    return n.fraud>0?14:n.score>600?10:7;
+  };
   const selNode=selected?nodes.find(n=>n.id===selected):null;
+  const connectedEdges=selNode?edges.filter(e=>e.from===selNode.id||e.to===selNode.id):[];
 
   return(
-    <div style={{height:'calc(100vh-88px)'}}>
+    <div>
       <div className="page-title">🕸 Red de Riesgo</div>
-      <div className="page-sub">Nodos = identidades · Aristas = conexiones de riesgo · Color = nivel de riesgo</div>
+      <div className="page-sub">Visualización interactiva de conexiones entre identidades, dispositivos e IPs sospechosas</div>
+
+      {/* Controles */}
       <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
-        {[['🔴 FRAUD/CRÍTICO','#ff3b5c'],['🟡 RISKY/ALTO','#f59e0b'],['🟢 CLEAN/BAJO','#14b8a6'],['⚪ UNKNOWN','#6b7280']].map(([l,c])=><div key={l} style={{display:'flex',alignItems:'center',gap:5,fontSize:9,color:'var(--slate)'}}><div style={{width:10,height:10,borderRadius:'50%',background:c}}/>{l}</div>)}
-        <span style={{marginLeft:'auto',fontSize:9,color:'var(--slate)'}}>{nodes.length} nodos · {edges.length} conexiones</span>
+        {deviceResult&&<>
+          <button onClick={()=>setMode('device')} className={`btn ${mode==='device'?'btn-purple':'btn-ghost'}`} style={{padding:'4px 12px',fontSize:9}}>📱 Dispositivos del archivo</button>
+          <button onClick={()=>setMode('api')} className={`btn ${mode==='api'?'btn-teal':'btn-ghost'}`} style={{padding:'4px 12px',fontSize:9}}>🔗 Perfiles del sistema</button>
+          {mode==='device'&&<div style={{display:'flex',gap:4,marginLeft:8}}>
+            {[['devices','📱 Devices'],['accounts','👤 Cuentas'],['ips','🌐 IPs']].map(([v,l])=>(
+              <button key={v} onClick={()=>setViewMode(v)} style={{padding:'3px 9px',borderRadius:4,border:'1px solid',fontSize:8,cursor:'pointer',fontFamily:'var(--mono)',background:viewMode===v?'rgba(168,85,247,.2)':'var(--bg3)',borderColor:viewMode===v?'rgba(168,85,247,.5)':'var(--border2)',color:viewMode===v?'var(--purple)':'var(--muted)'}}>{l}</button>
+            ))}
+          </div>}
+        </>}
+        {!deviceResult&&<div style={{fontSize:9,color:'var(--slate)',padding:'4px 8px',background:'var(--bg3)',borderRadius:4,border:'1px solid var(--border2)'}}>💡 Sube un archivo de dispositivos en Carga Masiva para ver la red de conexiones</div>}
+        <div style={{marginLeft:'auto',display:'flex',gap:10,alignItems:'center'}}>
+          {[['🔴 Crítico/Fraud','#ff3b5c'],['🟡 Alto/Risky','#f59e0b'],['🟢 Limpio','#14b8a6'],['⚪ Desconocido','#6b7280']].map(([l,c])=>(
+            <div key={l} style={{display:'flex',alignItems:'center',gap:4,fontSize:8,color:'var(--slate)'}}><div style={{width:8,height:8,borderRadius:'50%',background:c}}/>{l}</div>
+          ))}
+          <span style={{fontSize:8,color:'var(--border2)'}}>|</span>
+          <span style={{fontSize:8,color:'var(--slate)'}}>{nodes.length} nodos · {edges.length} aristas</span>
+        </div>
       </div>
-      <div style={{display:'grid',gridTemplateColumns:selNode?'1fr 280px':'1fr',gap:12,height:'calc(100vh - 200px)'}}>
+
+      <div style={{display:'grid',gridTemplateColumns:selNode?'1fr 300px':'1fr',gap:12,height:'calc(100vh - 220px)'}}>
         <div style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:12,overflow:'hidden',position:'relative'}}>
-          {loading&&<div className="center"><Spinner/>Construyendo red...</div>}
-          {!loading&&<svg ref={svgRef} className="graph-svg" style={{position:'absolute',top:0,left:0,width:'100%',height:'100%'}}>
-            <defs><marker id="arr" markerWidth="6" markerHeight="6" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L6,3 z" fill="rgba(255,255,255,.2)"/></marker></defs>
+          {loading&&<div className="center" style={{flexDirection:'column',gap:8}}><Spinner/>
+            <div style={{fontSize:10,color:'var(--slate)'}}>Calculando layout de fuerza...</div>
+          </div>}
+          {!loading&&<svg ref={svgRef} style={{position:'absolute',top:0,left:0,width:'100%',height:'100%'}}>
+            <defs>
+              <marker id="arr" markerWidth="5" markerHeight="5" refX="5" refY="2.5" orient="auto">
+                <path d="M0,0 L0,5 L5,2.5 z" fill="rgba(255,255,255,.15)"/>
+              </marker>
+            </defs>
             {edges.map((e,i)=>{
               const a=nodes.find(n=>n.id===e.from),b=nodes.find(n=>n.id===e.to);
               if(!a||!b)return null;
-              return<line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="rgba(255,255,255,.1)" strokeWidth={e.weight>0.8?2:1} markerEnd="url(#arr)"/>;
+              const isSel=selNode&&(e.from===selNode.id||e.to===selNode.id);
+              return<line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+                stroke={isSel?'rgba(255,59,92,.6)':'rgba(255,255,255,.08)'}
+                strokeWidth={isSel?2:(e.weight||1)>1?1.5:1}
+                markerEnd="url(#arr)"/>;
             })}
             {nodes.map(n=>{
               const c=riskNodeColor(n.risk,n.score);
-              const r=n.fraud>0?14:n.score>600?10:7;
+              const r=nodeRadius(n);
               const sel=selected===n.id;
+              const isConn=selNode&&connectedEdges.some(e=>e.from===n.id||e.to===n.id);
               return<g key={n.id} onClick={()=>setSelected(sel?null:n.id)} style={{cursor:'pointer'}}>
-                <circle cx={n.x} cy={n.y} r={r+(sel?4:0)} fill={c} fillOpacity={sel?1:0.75} stroke={sel?'#fff':c} strokeWidth={sel?2:1}/>
-                {(n.fraud>0||n.score>700)&&<text x={n.x} y={n.y-r-4} textAnchor="middle" className="node-label" style={{fontSize:8}}>{n.label}</text>}
-                {sel&&<text x={n.x} y={n.y+r+12} textAnchor="middle" className="node-label">{n.score}</text>}
+                {sel&&<circle cx={n.x} cy={n.y} r={r+6} fill="none" stroke={c} strokeWidth={1.5} strokeDasharray="4,3" opacity={0.6}/>}
+                <circle cx={n.x} cy={n.y} r={r+(sel?3:0)} fill={c}
+                  fillOpacity={selNode&&!sel&&!isConn?0.25:sel?1:0.8}
+                  stroke={sel?'#fff':isConn?c:'none'} strokeWidth={sel?2:1}/>
+                {(sel||n.score>=700||r>=12)&&<text x={n.x} y={n.y-r-5} textAnchor="middle"
+                  style={{fontSize:8,fill:'#94a3b8',pointerEvents:'none'}}>{n.label}</text>}
               </g>;
             })}
           </svg>}
-          {!loading&&nodes.length===0&&<div className="center" style={{flexDirection:'column',gap:8}}><div style={{fontSize:32,opacity:.3}}>🕸</div><div>No hay perfiles para mostrar</div></div>}
+          {!loading&&nodes.length===0&&<div className="center" style={{flexDirection:'column',gap:8}}>
+            <div style={{fontSize:32,opacity:.2}}>🕸</div>
+            <div style={{fontSize:11,color:'var(--slate)'}}>No hay datos para mostrar en este modo</div>
+          </div>}
         </div>
+
+        {/* Panel detalle nodo */}
         {selNode&&(
           <div style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:12,padding:'16px',overflowY:'auto'}}>
-            <div style={{display:'flex',justifyContent:'space-between',marginBottom:12}}><div style={{fontFamily:'var(--sans)',fontSize:13,fontWeight:700}}>Nodo seleccionado</div><button onClick={()=>setSelected(null)} style={{background:'none',border:'none',color:'var(--slate)',fontSize:14,cursor:'pointer'}}>✕</button></div>
-            <div style={{background:'var(--bg3)',borderRadius:6,padding:'8px 10px',marginBottom:8}}><div style={{fontSize:8,color:'var(--slate)',marginBottom:2}}>IDENTIDAD</div><div style={{fontSize:10,color:'var(--teal)',wordBreak:'break-all'}}>{selNode.label}</div></div>
-            <div className="grid-2" style={{gap:6}}>
-              {[['Score máx',selNode.score,scoreColor(selNode.score)],['TX 30d',selNode.tx,'var(--light)'],['Fraudes',selNode.fraud,selNode.fraud>0?'var(--red)':'var(--teal)'],['Riesgo',selNode.risk,riskNodeColor(selNode.risk,selNode.score)]].map(([l,v,c])=><div className="pstat" key={l}><div className="pstat-val" style={{color:c,fontSize:14}}>{v}</div><div className="pstat-lbl">{l}</div></div>)}
+            <div style={{display:'flex',justifyContent:'space-between',marginBottom:12}}>
+              <div style={{fontFamily:'var(--sans)',fontSize:13,fontWeight:700,color:'var(--white)'}}>{selNode.type==='device'?'📱 Dispositivo':selNode.type==='ip'?'🌐 IP':selNode.type==='account'?'👤 Cuenta':'🔗 Perfil'}</div>
+              <button onClick={()=>setSelected(null)} style={{background:'none',border:'none',color:'var(--slate)',fontSize:16,cursor:'pointer'}}>✕</button>
             </div>
-            <div style={{marginTop:10,fontSize:9,color:'var(--slate)'}}>Conexiones: {edges.filter(e=>e.from===selNode.id||e.to===selNode.id).length}</div>
+
+            <div style={{background:'var(--bg3)',borderRadius:6,padding:'8px 10px',marginBottom:10,wordBreak:'break-all',fontSize:9,color:'var(--teal)',fontFamily:'var(--mono)'}}>{selNode.fullLabel||selNode.label}</div>
+
+            <div style={{display:'flex',gap:4,marginBottom:10}}>
+              <div style={{flex:1,background:'var(--bg3)',borderRadius:5,padding:'7px 9px',textAlign:'center'}}>
+                <div style={{fontFamily:'var(--sans)',fontSize:18,fontWeight:800,color:riskNodeColor(selNode.risk,selNode.score)}}>{selNode.score}</div>
+                <div style={{fontSize:8,color:'var(--slate)',marginTop:1}}>Score riesgo</div>
+              </div>
+              <div style={{flex:1,background:'var(--bg3)',borderRadius:5,padding:'7px 9px',textAlign:'center'}}>
+                <div style={{fontFamily:'var(--sans)',fontSize:18,fontWeight:800,color:'var(--light)'}}>{connectedEdges.length}</div>
+                <div style={{fontSize:8,color:'var(--slate)',marginTop:1}}>Conexiones</div>
+              </div>
+            </div>
+
+            {selNode.type==='device'&&<>
+              {selNode.accounts?.length>0&&<><div style={{fontSize:8,color:'var(--slate)',letterSpacing:'.1em',marginBottom:5}}>CUENTAS AFECTADAS</div>
+              {selNode.accounts.map((a,i)=><div key={i} style={{fontSize:9,padding:'4px 7px',background:'rgba(255,59,92,.1)',borderRadius:4,marginBottom:3,color:'var(--light)',fontFamily:'var(--mono)'}}>{a.slice(0,30)}{a.length>30?'…':''}</div>)}</>}
+              {selNode.ips?.length>0&&<><div style={{fontSize:8,color:'var(--slate)',letterSpacing:'.1em',margin:'8px 0 5px'}}>IPS USADAS</div>
+              {selNode.ips.slice(0,6).map((ip,i)=><div key={i} style={{fontSize:9,padding:'3px 7px',background:'rgba(245,158,11,.1)',borderRadius:4,marginBottom:3,color:'var(--amber)'}}>{ip}</div>)}</>}
+              <div style={{marginTop:8,fontSize:9,color:'var(--slate)'}}>Sesiones: {selNode.sessions}</div>
+            </>}
+
+            {selNode.type==='ip'&&<>
+              <div style={{fontSize:8,color:'var(--slate)',letterSpacing:'.1em',marginBottom:5}}>CUENTAS QUE USARON ESTA IP</div>
+              {selNode.accounts?.map((a,i)=><div key={i} style={{fontSize:9,padding:'4px 7px',background:'rgba(59,130,246,.1)',borderRadius:4,marginBottom:3,color:'var(--blue)',fontFamily:'var(--mono)'}}>{a.slice(0,30)}</div>)}
+            </>}
+
+            {selNode.type==='account'&&<>
+              <div style={{fontSize:9,color:'var(--slate)'}}>Accedida desde <strong style={{color:'var(--purple)'}}>{selNode.devices}</strong> dispositivos sospechosos</div>
+            </>}
+
+            {selNode.type==='profile'&&<>
+              <div className="grid-2" style={{gap:6}}>
+                {[['TX 30d',selNode.tx||0,'var(--light)'],['Fraudes',selNode.fraud||0,(selNode.fraud||0)>0?'var(--red)':'var(--teal)']].map(([l,v,c])=>(
+                  <div key={l} style={{background:'var(--bg3)',borderRadius:5,padding:'7px 9px'}}><div style={{fontFamily:'var(--sans)',fontSize:16,fontWeight:800,color:c}}>{v}</div><div style={{fontSize:8,color:'var(--slate)',marginTop:1}}>{l}</div></div>
+                ))}
+              </div>
+            </>}
+
+            {/* Nodos conectados */}
+            {connectedEdges.length>0&&<>
+              <div style={{fontSize:8,color:'var(--slate)',letterSpacing:'.1em',margin:'10px 0 5px'}}>CONECTADO CON</div>
+              {connectedEdges.slice(0,8).map((e,i)=>{
+                const otherId=e.from===selNode.id?e.to:e.from;
+                const other=nodes.find(n=>n.id===otherId);
+                if(!other)return null;
+                return<div key={i} onClick={()=>setSelected(otherId)} style={{fontSize:9,padding:'4px 8px',background:'var(--bg3)',borderRadius:4,marginBottom:3,cursor:'pointer',color:'var(--muted)',display:'flex',justifyContent:'space-between',alignItems:'center'}} onMouseEnter={e=>e.currentTarget.style.background='var(--bg4)'} onMouseLeave={e=>e.currentTarget.style.background='var(--bg3)'}>
+                  <span style={{fontFamily:'var(--mono)'}}>{other.label}</span>
+                  {e.weight>1&&<span style={{fontSize:8,color:'var(--amber)'}}>{e.weight} compartidos</span>}
+                </div>;
+              })}
+            </>}
           </div>
         )}
       </div>
@@ -1111,6 +1295,7 @@ function AdminPanel({showToast,onBack}){
 /* ══════════ APP ROOT ══════════ */
 function App(){
   const [page,setPage]=useState('dashboard');const [apiUrl,setApiUrl]=useState(API_BASE);const [apiOk,setApiOk]=useState(null);const [entity,setEntity]=useState('DEMO');const [entities,setEntities]=useState([]);const [pending,setPending]=useState(0);const [toast,setToast]=useState(null);const [channel,setChannel]=useState('ALL');
+  const [deviceResult,setDeviceResult]=useState(null);
   const [user,setUser]=useState(()=>{try{return JSON.parse(localStorage.getItem('auth_user'));}catch{return null;}});
   const [authed,setAuthed]=useState(()=>!!localStorage.getItem('auth_token'));
   const showToast=useCallback((msg,type='ok')=>{setToast({msg,type});setTimeout(()=>setToast(null),3500);},[]);
@@ -1148,8 +1333,8 @@ function App(){
         {page==='dashboard'&&<Dashboard entity={activeEntity} channel={channel} toast={showToast}/>}
         {page==='alerts'&&<Alerts entity={activeEntity} channel={channel} showToast={showToast}/>}
         {page==='profiles'&&<Profiles entity={activeEntity} channel={channel} showToast={showToast}/>}
-        {page==='network'&&<NetworkGraph entity={activeEntity} channel={channel} showToast={showToast}/>}
-        {page==='upload'&&<UploadPage entity={activeEntity} showToast={showToast}/>}
+        {page==='network'&&<NetworkGraph entity={activeEntity} channel={channel} showToast={showToast} deviceResult={deviceResult}/>}
+        {page==='upload'&&<UploadPage entity={activeEntity} showToast={showToast} onDeviceResult={(r)=>{setDeviceResult(r);setTimeout(()=>setPage('network'),1200);}}/>}
         {page==='rules'&&<RulesEditor entity={activeEntity} showToast={showToast}/>}
         {page==='entities'&&<Entities onEntityChange={loadEntities} showToast={showToast}/>}
         {page==='model'&&<ModelPage entity={activeEntity} showToast={showToast}/>}
