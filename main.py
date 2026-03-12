@@ -376,13 +376,13 @@ def label_alert(
     db.commit()
 
     retrain_triggered = False
-    if feedback.trigger_retrain and feedback.analyst_label in ("CONFIRMED_FRAUD","FALSE_POSITIVE"):
-        labeled = db.query(Alert).filter(
-            Alert.analyst_label.in_(["CONFIRMED_FRAUD","FALSE_POSITIVE"])
-        ).count()
-        if labeled >= 5:
-            background_tasks.add_task(_retrain_bg, alert.entity_id)
-            retrain_triggered = True
+    # Re-entrenamiento automático cada 20 calificaciones (no manual)
+    labeled = db.query(Alert).filter(
+        Alert.analyst_label.in_(["CONFIRMED_FRAUD","FALSE_POSITIVE"])
+    ).count()
+    if labeled > 0 and labeled % 20 == 0:
+        background_tasks.add_task(_retrain_bg, alert.entity_id)
+        retrain_triggered = True
 
     return {
         "message": "Feedback guardado",
@@ -415,7 +415,8 @@ def model_versions(db: Session = Depends(get_db)):
 def train_model(
     entity_code: Optional[str] = None,
     background_tasks: BackgroundTasks = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_superadmin)
 ):
     entity_id = None
     if entity_code:
@@ -430,7 +431,7 @@ def train_model(
             "entity_id": entity_id}
 
 @app.get("/api/v2/model/stats", tags=["Modelo ML"])
-def model_stats(db: Session = Depends(get_db)):
+def model_stats(entity_code: Optional[str] = None, db: Session = Depends(get_db)):
     total_labeled = db.query(Alert).filter(
         Alert.analyst_label.in_(["CONFIRMED_FRAUD","FALSE_POSITIVE"])
     ).count()
@@ -439,12 +440,102 @@ def model_stats(db: Session = Depends(get_db)):
     pending       = db.query(Alert).filter(Alert.status == "PENDING").count()
     latest        = db.query(ModelVersion).filter(ModelVersion.is_active==True).order_by(desc(ModelVersion.trained_at)).first()
     precision = round(fraud_labeled / max(fraud_labeled + fp_labeled, 1) * 100, 1)
+
+    # ── Curva ROC aproximada desde scores reales ──────────────────
+    # Tomamos alertas calificadas: CONFIRMED_FRAUD = positivo real, FALSE_POSITIVE = negativo real
+    roc_query = db.query(Alert.score_final, Alert.analyst_label).filter(
+        Alert.analyst_label.in_(["CONFIRMED_FRAUD","FALSE_POSITIVE"])
+    )
+    if entity_code:
+        e = db.query(Entity).filter(Entity.code == entity_code).first()
+        if e: roc_query = roc_query.filter(Alert.entity_id == e.id)
+
+    roc_data = roc_query.all()
+    roc_points = []
+    auc_value  = None
+
+    if len(roc_data) >= 4:
+        # Umbrales de 0 a 999
+        thresholds = list(range(0, 1001, 20))
+        scores  = [r[0] or 0 for r in roc_data]
+        labels  = [1 if r[1] == "CONFIRMED_FRAUD" else 0 for r in roc_data]
+        n_pos   = sum(labels)
+        n_neg   = len(labels) - n_pos
+
+        if n_pos > 0 and n_neg > 0:
+            for thr in thresholds:
+                tp = sum(1 for s,l in zip(scores,labels) if s >= thr and l == 1)
+                fp = sum(1 for s,l in zip(scores,labels) if s >= thr and l == 0)
+                tpr = round(tp / n_pos, 4)
+                fpr = round(fp / n_neg, 4)
+                roc_points.append({"threshold": thr, "tpr": tpr, "fpr": fpr})
+
+            # AUC por regla del trapecio
+            roc_sorted = sorted(roc_points, key=lambda x: x["fpr"])
+            auc = 0.0
+            for i in range(1, len(roc_sorted)):
+                dx = roc_sorted[i]["fpr"] - roc_sorted[i-1]["fpr"]
+                dy = (roc_sorted[i]["tpr"] + roc_sorted[i-1]["tpr"]) / 2
+                auc += dx * dy
+            auc_value = round(abs(auc), 4)
+
+    # Curva ROC por entidad (si se pide)
+    entity_latest  = None
+    entity_roc_pts = []
+    entity_auc     = None
+
+    if entity_code:
+        e = db.query(Entity).filter(Entity.code == entity_code).first()
+        if e:
+            entity_latest = db.query(ModelVersion).filter(
+                ModelVersion.entity_id == e.id, ModelVersion.is_active == True
+            ).order_by(desc(ModelVersion.trained_at)).first()
+
+            # ROC propia de la entidad (solo sus alertas calificadas)
+            ent_roc_data = db.query(Alert.score_final, Alert.analyst_label).filter(
+                Alert.entity_id == e.id,
+                Alert.analyst_label.in_(["CONFIRMED_FRAUD","FALSE_POSITIVE"])
+            ).all()
+
+            if len(ent_roc_data) >= 4:
+                e_scores = [r[0] or 0 for r in ent_roc_data]
+                e_labels = [1 if r[1] == "CONFIRMED_FRAUD" else 0 for r in ent_roc_data]
+                e_npos   = sum(e_labels)
+                e_nneg   = len(e_labels) - e_npos
+                if e_npos > 0 and e_nneg > 0:
+                    for thr in list(range(0, 1001, 20)):
+                        tp = sum(1 for s,l in zip(e_scores,e_labels) if s >= thr and l == 1)
+                        fp = sum(1 for s,l in zip(e_scores,e_labels) if s >= thr and l == 0)
+                        entity_roc_pts.append({
+                            "threshold": thr,
+                            "tpr": round(tp / e_npos, 4),
+                            "fpr": round(fp / e_nneg, 4),
+                        })
+                    e_sorted = sorted(entity_roc_pts, key=lambda x: x["fpr"])
+                    e_auc = 0.0
+                    for i in range(1, len(e_sorted)):
+                        dx = e_sorted[i]["fpr"] - e_sorted[i-1]["fpr"]
+                        dy = (e_sorted[i]["tpr"] + e_sorted[i-1]["tpr"]) / 2
+                        e_auc += dx * dy
+                    entity_auc = round(abs(e_auc), 4)
+
     return {
         "labels": {"total": total_labeled, "fraud": fraud_labeled, "false_positives": fp_labeled},
         "pending_alerts": pending,
         "precision_estimate": precision,
         "latest_model": latest.to_dict() if latest else None,
+        "entity_model": entity_latest.to_dict() if entity_latest else None,
         "ready_for_training": total_labeled >= 5,
+        "roc": {
+            "points":    roc_points,
+            "auc":       auc_value,
+            "n_samples": len(roc_data),
+        },
+        "entity_roc": {
+            "points":    entity_roc_pts,
+            "auc":       entity_auc,
+            "n_samples": len(ent_roc_data) if entity_code else 0,
+        } if entity_code else None,
     }
 
 
