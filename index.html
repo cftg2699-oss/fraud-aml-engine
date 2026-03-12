@@ -497,9 +497,9 @@ function Alerts({entity, channel, showToast}) {
     try {
       const r = await api(`/api/v2/alerts/${selected}/feedback`, {
         method:'POST',
-        body:{analyst_label:label, analyst_note:note, analyst_id:'analyst_001', trigger_retrain:true}
+        body:{analyst_label:label, analyst_note:note, analyst_id:'analyst_001', trigger_retrain:false}
       });
-      showToast(r.retrain_triggered ? '✅ Calificado — modelo re-entrenando...' : '✅ Calificación guardada', 'ok');
+      showToast(r.retrain_triggered ? '✅ Calificado — re-entrenamiento automático disparado (20 labels)' : '✅ Calificación guardada', 'ok');
       loadAlerts();
       setDetail(d => d ? {...d, alert:{...d.alert, feedback:{...d.alert.feedback, status:label, analyst_label:label}}} : d);
     } catch(e) { showToast('Error: ' + e.message,'err'); }
@@ -509,12 +509,55 @@ function Alerts({entity, channel, showToast}) {
   const filters = [['PENDING','Pendientes'],['CONFIRMED_FRAUD','Fraude'],['FALSE_POSITIVE','Falso +'],['UNDER_REVIEW','Revisión'],['ALL','Todas']];
   const current = alerts.find(a=>a.id===selected);
 
+  // Generar y descargar reporte CSV de alertas
+  const downloadReport = () => {
+    if (!alerts.length) { showToast('Sin alertas para exportar','err'); return; }
+
+    const now    = new Date().toISOString().slice(0,19).replace('T','_').replace(/:/g,'-');
+    const header = ['ID','Fecha','Canal','Cardholder','Score','Decisión','Nivel Riesgo','Regla Principal','Monto','Ciudad','Estado','Nota Analista'];
+    const rows   = alerts.map(a => [
+      a.id,
+      a.created_at ? a.created_at.slice(0,19).replace('T',' ') : '',
+      a.channel || '',
+      (a.cardholder || '').replace(/,/g,' '),
+      a.score_final || 0,
+      a.decision || '',
+      a.risk_level || '',
+      (a.top_rule || '').replace(/,/g,' '),
+      a.amount || 0,
+      (a.city || '').replace(/,/g,' '),
+      a.status || '',
+      (a.analyst_note || '').replace(/,/g,' ').replace(/\n/g,' '),
+    ]);
+
+    const csv  = [header, ...rows].map(r => r.join(',')).join('\n');
+    const blob = new Blob(['\uFEFF' + csv], {type:'text/csv;charset=utf-8;'});
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = 'alertas_' + (entity||'todas') + '_' + now + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('Reporte descargado — ' + alerts.length + ' alertas', 'ok');
+  };
+
   return (
     <div className="split" style={{marginTop:-20,marginLeft:-20,marginRight:-20}}>
       {/* LEFT: Lista */}
       <div style={{display:'flex',flexDirection:'column',overflow:'hidden',borderRight:'1px solid var(--border)'}}>
         <div style={{padding:'12px 14px',borderBottom:'1px solid var(--border)',background:'var(--bg2)',flexShrink:0}}>
-          <div style={{fontFamily:'var(--sans)',fontSize:14,fontWeight:700,color:'var(--white)',marginBottom:8}}>Visor de Alertas</div>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+            <div style={{fontFamily:'var(--sans)',fontSize:14,fontWeight:700,color:'var(--white)'}}>Visor de Alertas</div>
+            <button
+              className="btn btn-ghost"
+              style={{fontSize:8,padding:'3px 10px',display:'flex',alignItems:'center',gap:4}}
+              onClick={downloadReport}
+              title="Descargar reporte CSV de alertas visibles">
+              ⬇ CSV
+            </button>
+          </div>
           <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
             {filters.map(([f,l])=>(
               <button key={f} onClick={()=>setFilter(f)}
@@ -789,7 +832,7 @@ function Alerts({entity, channel, showToast}) {
                     value={note} onChange={e=>setNote(e.target.value)}
                     style={{width:'100%',padding:'6px 8px',fontSize:9,resize:'none',marginBottom:6,background:'var(--bg4)',border:'1px solid var(--border2)',color:'var(--light)',borderRadius:4,outline:'none'}}/>
                   <button className="btn btn-red" style={{width:'100%'}} disabled={!label||submitting} onClick={submitFeedback}>
-                    {submitting?<><Spinner/>Guardando...</>:'Guardar + Re-entrenar →'}
+                    {submitting?<><Spinner/>Guardando...</>:'Guardar calificación →'}
                   </button>
                 </>
               )}
@@ -1189,18 +1232,23 @@ function Entities({onEntityChange, showToast}) {
 /* ══════════════════════════════════════════
    PAGE: MODELO ML
 ══════════════════════════════════════════ */
-function ModelPage({entity, showToast}) {
+function ModelPage({entity, showToast, userRole}) {
   const [stats, setStats]     = useState(null);
   const [versions, setVers]   = useState([]);
   const [loading, setLoad]    = useState(true);
   const [training, setTrain]  = useState(false);
+  const isSuperAdmin = userRole === 'superadmin';
 
   const load = useCallback(async () => {
     try {
-      const [s, v] = await Promise.all([api('/api/v2/model/stats'), api('/api/v2/model/versions')]);
+      const entQ = entity ? '?entity_code=' + entity : '';
+      const [s, v] = await Promise.all([
+        api('/api/v2/model/stats' + entQ),
+        api('/api/v2/model/versions'),
+      ]);
       setStats(s); setVers(v.versions); setLoad(false);
     } catch(e) { setLoad(false); }
-  }, []);
+  }, [entity]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -1261,22 +1309,62 @@ function ModelPage({entity, showToast}) {
             </div>
           )}
 
-          {/* Acciones */}
+          {/* Acciones — solo superadmin puede re-entrenar manualmente */}
           <div className="card" style={{marginBottom:14}}>
-            <div className="card-title">Re-entrenar modelo</div>
-            <div style={{display:'flex',gap:8,marginTop:8,flexWrap:'wrap'}}>
-              <button className="btn btn-teal" disabled={training||!stats.ready_for_training} onClick={()=>train(null)}>
-                {training?<><Spinner/>Entrenando...</>:'🌍 Re-entrenar modelo global'}
-              </button>
-              {entity && (
-                <button className="btn btn-amber" disabled={training} onClick={()=>train(entity)}>
-                  {training?<><Spinner/>Entrenando...</>:`🏛 Re-entrenar modelo de ${entity}`}
-                </button>
-              )}
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:10}}>
+              <div className="card-title" style={{margin:0}}>Re-entrenamiento automático</div>
+              {isSuperAdmin && <span className="badge CLEAN" style={{fontSize:7}}>SUPERADMIN</span>}
             </div>
-            {!stats.ready_for_training && (
-              <div style={{marginTop:8,fontSize:9,color:'var(--amber)'}}>
-                ⚠ Se necesitan mínimo 5 alertas calificadas. Tienes {stats.labels.total}. Califica alertas en el Visor.
+
+            {/* Progreso hacia próximo re-entrenamiento */}
+            {(() => {
+              const total = stats.labels.total;
+              const nextMilestone = Math.ceil(total / 20) * 20 || 20;
+              const progress = total % 20;
+              const pct = Math.round((progress / 20) * 100);
+              return (
+                <div style={{marginBottom:12}}>
+                  <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
+                    <span style={{fontSize:9,color:'var(--slate)'}}>Calificaciones hacia próximo re-entrenamiento</span>
+                    <span style={{fontFamily:'var(--sans)',fontSize:11,fontWeight:700,color:'var(--teal)'}}>{progress}/20</span>
+                  </div>
+                  <div style={{height:6,background:'var(--bg4)',borderRadius:3,overflow:'hidden'}}>
+                    <div style={{width:pct+'%',height:'100%',background:'var(--teal)',borderRadius:3,transition:'width .4s'}}/>
+                  </div>
+                  <div style={{marginTop:4,fontSize:8,color:'var(--border2)'}}>
+                    {progress === 0 && total > 0
+                      ? '✅ Re-entrenamiento disparado en la última calificación'
+                      : `Faltan ${20 - progress} calificaciones para el próximo re-entrenamiento automático`}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Solo superadmin ve los botones de re-entrenamiento forzado */}
+            {isSuperAdmin ? (
+              <>
+                <div style={{fontSize:8,color:'var(--amber)',marginBottom:8,padding:'6px 8px',background:'rgba(245,158,11,.08)',border:'1px solid rgba(245,158,11,.2)',borderRadius:4}}>
+                  ⚠ Re-entrenamiento forzado — solo disponible para superadmin. En condiciones normales el modelo se re-entrena automáticamente cada 20 calificaciones.
+                </div>
+                <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                  <button className="btn btn-teal" disabled={training||!stats.ready_for_training} onClick={()=>train(null)}>
+                    {training?<><Spinner/>Entrenando...</>:'🌍 Forzar re-entrenamiento global'}
+                  </button>
+                  {entity && (
+                    <button className="btn btn-amber" disabled={training} onClick={()=>train(entity)}>
+                      {training?<><Spinner/>Entrenando...</>:`🏛 Forzar re-entrenamiento de ${entity}`}
+                    </button>
+                  )}
+                </div>
+                {!stats.ready_for_training && (
+                  <div style={{marginTop:8,fontSize:9,color:'var(--amber)'}}>
+                    ⚠ Se necesitan mínimo 5 alertas calificadas para entrenar. Actuales: {stats.labels.total}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div style={{fontSize:9,color:'var(--slate)',padding:'8px 10px',background:'var(--bg3)',borderRadius:4,border:'1px solid var(--border)'}}>
+                🤖 El modelo se re-entrena automáticamente cada 20 calificaciones de analistas. No se requiere acción manual.
               </div>
             )}
           </div>
@@ -1304,6 +1392,148 @@ function ModelPage({entity, showToast}) {
           </div>
         </>
       )}
+
+      {/* ── Curva ROC ── */}
+      {stats && (() => {
+        const roc    = stats.roc;
+        const hasROC = roc && roc.points && roc.points.length > 2;
+
+        // Pedir también ROC de la entidad propia si no es superadmin o si hay entidad seleccionada
+        // Los datos de entidad vienen de stats.entity_roc si entity_code se pasó
+        const entRoc    = stats.entity_roc;
+        const hasEntROC = entRoc && entRoc.points && entRoc.points.length > 2;
+
+        return (
+          <div className="card" style={{marginBottom:14}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+              <div>
+                <div className="card-title" style={{margin:0}}>Curva ROC</div>
+                <div style={{fontSize:9,color:'var(--slate)',marginTop:2}}>
+                  {hasROC
+                    ? `Modelo global — ${roc.n_samples} alertas calificadas`
+                    : 'Se necesitan mínimo 4 alertas calificadas para calcular ROC'}
+                </div>
+              </div>
+              <div style={{display:'flex',gap:12,alignItems:'center'}}>
+                {hasROC && (
+                  <div style={{textAlign:'center'}}>
+                    <div style={{fontFamily:'var(--sans)',fontSize:20,fontWeight:800,color:roc.auc>=0.7?'var(--teal)':roc.auc>=0.5?'var(--amber)':'var(--red)'}}>{roc.auc}</div>
+                    <div style={{fontSize:7,color:'var(--slate)'}}>AUC GLOBAL</div>
+                  </div>
+                )}
+                {hasEntROC && (
+                  <div style={{textAlign:'center'}}>
+                    <div style={{fontFamily:'var(--sans)',fontSize:20,fontWeight:800,color:entRoc.auc>=0.7?'var(--blue)':entRoc.auc>=0.5?'var(--purple)':'var(--red)'}}>{entRoc.auc}</div>
+                    <div style={{fontSize:7,color:'var(--slate)'}}>AUC {entity||'ENTIDAD'}</div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {!hasROC && !hasEntROC && (
+              <div style={{height:180,display:'flex',alignItems:'center',justifyContent:'center',background:'var(--bg3)',borderRadius:6,flexDirection:'column',gap:8,opacity:.5}}>
+                <div style={{fontSize:28}}>📈</div>
+                <div style={{fontSize:10,color:'var(--slate)'}}>Califica alertas para generar la curva ROC</div>
+              </div>
+            )}
+
+            {(hasROC || hasEntROC) && (() => {
+              const W=380, H=220, PAD=38;
+
+              const sx = fpr => PAD + fpr * (W - PAD*1.6);
+              const sy = tpr => H - PAD - tpr * (H - PAD*1.6);
+
+              const makePath = (points) => {
+                const sorted = [...points].sort((a,b)=>a.fpr-b.fpr);
+                return sorted.map((p,i)=>(i===0?'M':'L')+sx(p.fpr).toFixed(1)+','+sy(p.tpr).toFixed(1)).join(' ');
+              };
+
+              const globalPath = hasROC  ? makePath(roc.points)    : null;
+              const entPath    = hasEntROC ? makePath(entRoc.points) : null;
+              const diagD      = 'M'+sx(0)+','+sy(0)+' L'+sx(1)+','+sy(1);
+              const grid       = [0, 0.2, 0.4, 0.6, 0.8, 1.0];
+
+              return (
+                <div style={{overflowX:'auto'}}>
+                  <svg viewBox={'0 0 '+W+' '+H} style={{width:'100%',maxWidth:460,display:'block',margin:'0 auto'}}>
+                    {/* Grid */}
+                    {grid.map(v=>(
+                      <g key={v}>
+                        <line x1={sx(v)} y1={PAD*0.6} x2={sx(v)} y2={H-PAD} stroke="rgba(255,255,255,.06)" strokeWidth={1}/>
+                        <line x1={PAD} y1={sy(v)} x2={W-PAD*0.6} y2={sy(v)} stroke="rgba(255,255,255,.06)" strokeWidth={1}/>
+                        <text x={sx(v)} y={H-PAD+11} textAnchor="middle" fontSize={7} fill="rgba(255,255,255,.3)">{v}</text>
+                        <text x={PAD-5} y={sy(v)+3} textAnchor="end" fontSize={7} fill="rgba(255,255,255,.3)">{v}</text>
+                      </g>
+                    ))}
+
+                    {/* Ejes */}
+                    <line x1={PAD} y1={PAD*0.6} x2={PAD} y2={H-PAD} stroke="rgba(255,255,255,.2)" strokeWidth={1}/>
+                    <line x1={PAD} y1={H-PAD} x2={W-PAD*0.6} y2={H-PAD} stroke="rgba(255,255,255,.2)" strokeWidth={1}/>
+
+                    {/* Labels ejes */}
+                    <text x={W/2} y={H-2} textAnchor="middle" fontSize={8} fill="rgba(255,255,255,.4)">FPR (Tasa Falsos Positivos)</text>
+                    <text x={10} y={H/2} textAnchor="middle" fontSize={8} fill="rgba(255,255,255,.4)" transform={'rotate(-90,10,'+H/2+')'}>TPR (Sensibilidad)</text>
+
+                    {/* Diagonal random */}
+                    <path d={diagD} stroke="rgba(255,255,255,.18)" strokeWidth={1} strokeDasharray="4,3" fill="none"/>
+
+                    {/* Área global */}
+                    {hasROC && (
+                      <path d={globalPath+' L'+sx(1)+','+sy(0)+' L'+sx(0)+','+sy(0)+' Z'} fill="rgba(20,184,166,.07)"/>
+                    )}
+                    {/* Curva global */}
+                    {hasROC && (
+                      <path d={globalPath} stroke="var(--teal)" strokeWidth={2.5} fill="none" strokeLinejoin="round"/>
+                    )}
+                    {/* Puntos curva global */}
+                    {hasROC && roc.points.filter((_,i)=>i%3===0).map((p,i)=>(
+                      <circle key={'g'+i} cx={sx(p.fpr)} cy={sy(p.tpr)} r={2.5} fill="var(--teal)" opacity={0.75}/>
+                    ))}
+
+                    {/* Área entidad */}
+                    {hasEntROC && (
+                      <path d={entPath+' L'+sx(1)+','+sy(0)+' L'+sx(0)+','+sy(0)+' Z'} fill="rgba(59,130,246,.07)"/>
+                    )}
+                    {/* Curva entidad */}
+                    {hasEntROC && (
+                      <path d={entPath} stroke="#3b82f6" strokeWidth={2} fill="none" strokeLinejoin="round" strokeDasharray="6,3"/>
+                    )}
+                    {/* Puntos curva entidad */}
+                    {hasEntROC && entRoc.points.filter((_,i)=>i%3===0).map((p,i)=>(
+                      <circle key={'e'+i} cx={sx(p.fpr)} cy={sy(p.tpr)} r={2} fill="#3b82f6" opacity={0.8}/>
+                    ))}
+
+                    {/* Leyenda */}
+                    <rect x={PAD+4} y={PAD*0.6+4} width={14} height={2} fill="var(--teal)"/>
+                    <text x={PAD+22} y={PAD*0.6+9} fontSize={7} fill="rgba(255,255,255,.65)">
+                      {'Modelo global'+(hasROC?' (AUC='+roc.auc+')':'')}
+                    </text>
+                    {hasEntROC && (
+                      <>
+                        <rect x={PAD+4} y={PAD*0.6+18} width={14} height={2} fill="#3b82f6"/>
+                        <text x={PAD+22} y={PAD*0.6+23} fontSize={7} fill="rgba(255,255,255,.55)">
+                          {(entity||'Entidad')+' (AUC='+entRoc.auc+')'}
+                        </text>
+                      </>
+                    )}
+                    <rect x={PAD+4} y={PAD*0.6+(hasEntROC?32:18)} width={14} height={1} fill="rgba(255,255,255,.2)"/>
+                    <text x={PAD+22} y={PAD*0.6+(hasEntROC?37:23)} fontSize={7} fill="rgba(255,255,255,.3)">Clasificador aleatorio</text>
+                  </svg>
+                </div>
+              );
+            })()}
+
+            {/* Interpretación */}
+            {hasROC && (
+              <div style={{marginTop:8,padding:'6px 10px',background:'var(--bg3)',borderRadius:4,fontSize:8,color:'var(--slate)'}}>
+                Global: AUC {roc.auc >= 0.9 ? '≥ 0.9 — Excelente' : roc.auc >= 0.7 ? '≥ 0.7 — Buena discriminación' : roc.auc >= 0.5 ? '≥ 0.5 — Moderada' : '< 0.5 — Revisar etiquetas'}.
+                {hasEntROC && (' · '+((entity||'Entidad'))+': AUC '+(entRoc.auc >= 0.7 ? 'Buena' : entRoc.auc >= 0.5 ? 'Moderada' : 'Revisar')+'.')}
+                {' '}Más calificaciones mejoran la curva.
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Historial de versiones */}
       <div className="sec">Historial de versiones del modelo</div>
@@ -3195,14 +3425,14 @@ function App() {
 
       <div className="main">
         {page==='dashboard'&&<Dashboard entity={activeEntity} channel={channel} toast={showToast}/>}
-        {page==='alerts'&&<Alerts entity={activeEntity} channel={channel} showToast={showToast}/>}
+        {page==='alerts'&&<Alerts entity={activeEntity} channel={channel} showToast={showToast} userRole={user&&user.role}/>}
         {page==='other_alerts'&&<OtherAlerts alerts={deviceAlerts} setAlerts={setDeviceAlerts} showToast={showToast}/>}
         {page==='network'&&<NetworkGraph deviceAlerts={deviceAlerts} channel={channel} entity={activeEntity} showToast={showToast}/>}
         {page==='profiles'&&<Profiles entity={activeEntity} channel={channel} showToast={showToast}/>}
         {page==='upload'&&<UploadPage entity={activeEntity} showToast={showToast} onDeviceResult={onDeviceResult}/>}
         {page==='entities'&&<Entities onEntityChange={loadEntities} showToast={showToast}/>}
         {page==='rules'&&<RulesEditor channel={channel} entity={activeEntity} showToast={showToast}/>}
-        {page==='model'&&<ModelPage entity={activeEntity} showToast={showToast}/>}
+        {page==='model'&&<ModelPage entity={activeEntity} showToast={showToast} userRole={user&&user.role}/>}
       </div>
 
       {toast&&<Toast msg={toast.msg} type={toast.type}/>}
